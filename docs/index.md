@@ -31,10 +31,10 @@ pip install -e ".[dev]"          # + pytest, pytest-cov, ruff, mypy, build, twin
 pip install -e ".[docs]"         # + mkdocs, mkdocs-material, mkdocstrings
 ```
 
-Runtime dependencies are `numpy >= 1.24` and `opencv-python >= 4.8`. The HTTP
+Runtime dependencies are `numpy >= 1.24` and `opencv-python-headless >= 4.8`. The HTTP
 clients use only the standard library unless you opt into the `httpx` transport.
 
-Supported Python versions: **3.10, 3.11, 3.12, 3.13**.
+Supported Python versions: **3.10, 3.11, 3.12, 3.13, 3.14**.
 
 ## Architecture
 

@@ -28,12 +28,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Image Processing",
     "Typing :: Typed",
 ]
 dependencies = [
     "numpy>=1.24",
-    "opencv-python>=4.8",
+    "opencv-python-headless>=4.8",
 ]
 
 [project.optional-dependencies]
@@ -53,9 +54,11 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/stanleykwembe/SPE"
-Documentation = "https://github.com/stanleykwembe/SPE/blob/main/SPE%20Pages/docs/index.md"
-Source = "https://github.com/stanleykwembe/SPE"
+Homepage = "https://github.com/kgosietsileRM/spe_sdk"
+Documentation = "https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md"
+Source = "https://github.com/kgosietsileRM/spe_sdk"
+Issues = "https://github.com/kgosietsileRM/spe_sdk/issues"
+Changelog = "https://github.com/kgosietsileRM/spe_sdk/blob/main/CHANGELOG.md"
 
 [project.scripts]
 spe = "spe.cli:main"
@@ -125,4 +128,7 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["cv2", "cv2.*", "requests", "requests.*", "httpx", "httpx.*"]
 ignore_missing_imports = true

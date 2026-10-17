@@ -1,8 +1,8 @@
 # SPE SDK
 
-[![CI](https://github.com/stanleykwembe/SPE/actions/workflows/ci.yml/badge.svg)](https://github.com/stanleykwembe/SPE/actions/workflows/ci.yml)
-[![Python versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/kgosietsileRM/spe_sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/kgosietsileRM/spe_sdk/actions/workflows/ci.yml)
+[![Python versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/kgosietsileRM/spe_sdk/blob/main/LICENSE)
 
 Python SDK for the **Spatial Intelligence Engine (SPE)** — spatial-intelligence
 middleware that turns visual observations into a persistent spatial
@@ -17,7 +17,7 @@ representation. The SDK gives Python applications two ways to work with SPE:
 
 > Part of the SPE entry for the **OpenCV AI Competition 2026**.
 
-[Full API reference →](docs/index.md)
+[Full API reference →](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md)
 
 ## Contents
 
@@ -63,16 +63,17 @@ pip install -e ".[docs]"         # + mkdocs toolchain
 
 Extras may be combined, e.g. `pip install -e ".[http,dev]"`.
 
-Runtime dependencies are intentionally small: `numpy` and `opencv-python`. The
+Runtime dependencies are intentionally small: `numpy` and
+`opencv-python-headless`. The
 synchronous HTTP client and the `AsyncSPEClient` wrapper use only the Python
 standard library; the `http` extra is only needed to opt into the `httpx`
 transport.
 
 ## Requirements
 
-- Python **3.10 – 3.13**
+- Python **3.10 – 3.14**
 - `numpy >= 1.24`
-- `opencv-python >= 4.8`
+- `opencv-python-headless >= 4.8`
 
 ## Quick start — local core
 
@@ -154,7 +155,7 @@ spe --version
 ```
 
 `spe` is installed as a console script; `python -m spe ...` works too. See the
-[CLI reference](docs/index.md#command-line) for every option.
+[CLI reference](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md#command-line) for every option.
 
 ## Configuration
 
@@ -227,19 +228,19 @@ except SPEError as error:  # catch-all for the whole SDK
 
 ## Examples
 
-Runnable scripts live under [`examples/`](examples):
+Runnable scripts live under [`examples/`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples):
 
 | Script | Shows |
 | --- | --- |
-| [`local_calibration.py`](examples/local_calibration.py) | In-process calibration, inspection, zones, and state round-tripping. |
-| [`detect_and_spatialize.py`](examples/detect_and_spatialize.py) | Enriching provider-neutral detections with calibrated spatial data. |
-| [`http_client.py`](examples/http_client.py) | Talking to a running engine with the synchronous client. |
-| [`async_client.py`](examples/async_client.py) | The asyncio client (`AsyncSPEClient`). |
-| [`stream_video.py`](examples/stream_video.py) | Streaming video frames into the detection endpoint with OpenCV. |
+| [`local_calibration.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/local_calibration.py) | In-process calibration, inspection, zones, and state round-tripping. |
+| [`detect_and_spatialize.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/detect_and_spatialize.py) | Enriching provider-neutral detections with calibrated spatial data. |
+| [`http_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_client.py) | Talking to a running engine with the synchronous client. |
+| [`async_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/async_client.py) | The asyncio client (`AsyncSPEClient`). |
+| [`stream_video.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/stream_video.py) | Streaming video frames into the detection endpoint with OpenCV. |
 
 ## API overview
 
-The full, exhaustive reference is in [`docs/index.md`](docs/index.md). At a glance:
+The full, exhaustive reference is in [`docs/index.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md). At a glance:
 
 | Surface | Key symbols |
 | --- | --- |
@@ -268,7 +269,7 @@ pytest --cov=spe      # tests + coverage
 The suite covers geometry, inspection, zones, the engine facade, value objects,
 the sync and async HTTP clients (against a local mock server), the transports,
 and the CLI. Linting, formatting, and strict type checking all pass, with line
-coverage held at ~99%. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the quality
+coverage held at ~99%. See [`CONTRIBUTING.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/CONTRIBUTING.md) for the quality
 gates and conventions.
 
 ### Package layout
@@ -294,14 +295,14 @@ src/spe/
 ## Releasing
 
 1. Bump `__version__` in `src/spe/_version.py`.
-2. Move the `Unreleased` entries in [`CHANGELOG.md`](CHANGELOG.md) under the new version.
+2. Move the `Unreleased` entries in [`CHANGELOG.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/CHANGELOG.md) under the new version.
 3. Tag and push (`git tag v0.1.1 && git push origin v0.1.1`); the release
    workflow builds, checks, and publishes to PyPI.
 
 ## Contributing
 
-Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Contributions are welcome — see [`CONTRIBUTING.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/CONTRIBUTING.md).
 
 ## License
 
-MIT © Peach LLC. See [`LICENSE`](LICENSE).
+MIT © Peach LLC. See [`LICENSE`](https://github.com/kgosietsileRM/spe_sdk/blob/main/LICENSE).

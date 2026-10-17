@@ -29,5 +29,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inspection, and calibration.
 - Runnable examples under `examples/`.
 
-[Unreleased]: https://github.com/stanleykwembe/SPE/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/stanleykwembe/SPE/releases/tag/v0.1.0
+[Unreleased]: https://github.com/kgosietsileRM/spe_sdk/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/kgosietsileRM/spe_sdk/releases/tag/v0.1.0

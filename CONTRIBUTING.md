@@ -12,7 +12,7 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-`numpy` and `opencv-python` are installed as runtime dependencies; the dev extra
+`numpy` and `opencv-python-headless` are installed as runtime dependencies; the dev extra
 adds `pytest`, `pytest-cov`, `ruff`, `mypy`, `build`, and `twine`.
 
 ## Quality gates
@@ -41,7 +41,7 @@ pre-commit install
 
 ## Guidelines
 
-- Keep the local core dependency-light: only `numpy` and `opencv-python`.
+- Keep the local core dependency-light: only `numpy` and `opencv-python-headless`.
 - Keep behaviour faithful to the engine's coordinate contract
   (`source_pixels` → `calibrated_reference_plane`, point order
   `top_left, top_right, bottom_right, bottom_left`).
