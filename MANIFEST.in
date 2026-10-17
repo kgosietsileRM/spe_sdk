@@ -1,0 +1,16 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include pyproject.toml
+include requirements.txt
+include requirements-dev.txt
+
+recursive-include src/spe py.typed
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include docs *.md
+
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.egg-info
