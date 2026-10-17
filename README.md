@@ -234,8 +234,14 @@ Runnable scripts live under [`examples/`](https://github.com/kgosietsileRM/spe_s
 | --- | --- |
 | [`local_calibration.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/local_calibration.py) | In-process calibration, inspection, zones, and state round-tripping. |
 | [`detect_and_spatialize.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/detect_and_spatialize.py) | Enriching provider-neutral detections with calibrated spatial data. |
+| [`retail_zone_analytics.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/retail_zone_analytics.py) | Per-zone occupancy, unique visitors, and dwell time from a frame sequence. |
+| [`security_intrusion_detection.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/security_intrusion_detection.py) | Alerting when a person's ground point enters a restricted polygon. |
+| [`warehouse_grid_inventory.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/warehouse_grid_inventory.py) | Bay occupancy map, empty-bay list, and fill ratio from pallet detections. |
+| [`traffic_lane_speed.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/traffic_lane_speed.py) | A metric reference plane (`units="meters"`) for lane assignment and speed. |
+| [`annotated_overlay.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/annotated_overlay.py) | Rendering the calibrated grid plus zone-labelled boxes to a PNG. |
 | [`http_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_client.py) | Talking to a running engine with the synchronous client. |
 | [`async_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/async_client.py) | The asyncio client (`AsyncSPEClient`). |
+| [`http_analysis_session.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_analysis_session.py) | A full server analysis session: health, source, frames, complete. |
 | [`stream_video.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/stream_video.py) | Streaming video frames into the detection endpoint with OpenCV. |
 
 ## API overview

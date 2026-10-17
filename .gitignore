@@ -35,3 +35,4 @@ Thumbs.db
 # Local scratch
 *.log
 outputs/local/
+examples/output/
