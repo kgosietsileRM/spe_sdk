@@ -15,6 +15,7 @@ quick-start examples, see the [README](../README.md).
 - [Spatial reference](#spatial-reference)
 - [Grid reference](#grid-reference)
 - [Zones reference](#zones-reference)
+- [Tracking, motion and observations](#tracking-motion-and-observations)
 - [`SPEClient`](#speclient)
 - [`AsyncSPEClient`](#asyncspeclient)
 - [Transports](#transports)
@@ -47,6 +48,9 @@ The SDK exposes two independent surfaces that share one coordinate contract:
 | `spe.spatial` | Point inspection and detection spatialization primitives. |
 | `spe.grid` | Image-space and calibrated grid rendering. |
 | `spe.zones` | Deterministic semantic zone identifiers. |
+| `spe.tracking` | Provider-neutral multi-object association (`ModelAgnosticTracker`). |
+| `spe.motion` | Bounded trajectories, velocity, direction, and prediction. |
+| `spe.observations` | Provider-neutral timestamped observation builders. |
 | `spe.models` | Typed value objects over the JSON contracts. |
 | `spe.client` | `SPEClient` — synchronous HTTP client for a running engine. |
 | `spe.aio` | `AsyncSPEClient` — asyncio wrapper around `SPEClient`. |
@@ -690,6 +694,91 @@ zone_for_cell(cell: dict | None, rows: int, columns: int) -> str | None
 
 Returns the zone id for a grid-cell dict, or `None` when unknown.
 
+## Tracking, motion and observations
+
+`spe.tracking`, `spe.motion`, and `spe.observations` mirror the engine's temporal
+layer. They are pure and in-process: they operate on normalized detection
+mappings and never touch images or a server.
+
+### `TrackingConfig`
+
+```python
+TrackingConfig(
+    min_iou: float = 0.01,
+    max_center_distance_scale: float = 2.5,
+    max_missing_seconds: float = 1.5,
+    confirmation_observations: int = 2,
+)
+```
+
+Association thresholds in source-pixel units and seconds.
+
+### `ModelAgnosticTracker`
+
+```python
+ModelAgnosticTracker(config: TrackingConfig | None = None)
+tracker.update(detections, timestamp=None) -> {"detections": [...], "diagnostics": {...}}
+tracker.snapshot() -> dict
+tracker.reset() -> None
+```
+
+`update` assigns stable `track-<n>` ids to detections while rejecting duplicate
+and out-of-order timestamps without mutating state. Diagnostics include
+`active_tracks`, `tracks_created`, `tracks_terminated`, `matched_detections`,
+and related counters.
+
+### `MotionConfig`
+
+```python
+MotionConfig(
+    max_trajectory_samples: int = 32,
+    max_velocity_gap_seconds: float = 2.0,
+    prediction_horizon_seconds: float = 0.5,
+    max_prediction_horizon_seconds: float = 2.0,
+    max_prediction_age_seconds: float = 1.5,
+    max_tracks: int = 256,
+)
+```
+
+### `SpatialTrackStateManager`
+
+```python
+SpatialTrackStateManager(config: MotionConfig | None = None)
+manager.update(detections, timestamp, prediction_enabled=False) -> dict
+manager.snapshot(timestamp=None, prediction_enabled=False) -> dict
+manager.reset() -> None
+```
+
+Prefers a valid detection `spatial.position` (keeping its coordinate system and
+units) and otherwise falls back to the bounding-box foot point in source
+pixels. Velocity is a finite difference over the last two samples; predictions
+are only produced when enabled and the track is fresh.
+
+### `create_observation`
+
+```python
+create_observation(
+    detection_result,
+    *,
+    analysis_id: str,
+    source_id: str,
+    timestamp: float,
+    frame_index: int,
+) -> dict
+```
+
+Builds a timestamped, provider-neutral observation without frame data,
+preserving calibrated `spatial` data and `track_id` when present. The SDK does
+not persist observations; store the returned dict however you prefer.
+
+### `create_image_observation`
+
+```python
+create_image_observation(detection_result, *, source_id: str) -> dict
+```
+
+Wraps one static-image detection result with source context.
+
 ## `SPEClient`
 
 `spe.client.SPEClient` is a thin, typed client for a running SPE engine server.
@@ -771,6 +860,7 @@ a binary file object.
 | --- | --- | --- |
 | `get_roi()` | `GET /api/roi` | `response["roi"]`. |
 | `create_roi(points)` | `POST /api/roi` | `response["roi"]`. |
+| `update_roi(points)` | `PUT /api/roi` | `response["roi"]`. |
 | `delete_roi()` | `DELETE /api/roi` | `None`. |
 | `get_grid()` | `GET /api/grid` | `response["grid"]`. |
 | `set_grid(rows, columns)` | `PUT /api/grid` | `response["grid"]`. |

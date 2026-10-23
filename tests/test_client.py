@@ -101,6 +101,13 @@ def test_roi_lifecycle(server, client):
     assert server.requests[-1]["method"] == "DELETE"
 
 
+def test_update_roi_uses_put(server, client):
+    roi = client.update_roi([[0, 0], [10, 0], [10, 10], [0, 10]])
+    assert roi["status"] == "defined"
+    assert server.requests[-1]["method"] == "PUT"
+    assert server.requests[-1]["path"] == "/api/roi"
+
+
 def test_grid_lifecycle(server, client):
     assert client.get_grid()["rows"] == 3
     assert client.set_grid(4, 6)["columns"] == 6

@@ -51,6 +51,10 @@ ROUTES: dict[tuple[str, str], tuple[int, object]] = {
         201,
         {"roi": {"status": "defined", "points": [[0, 0], [1, 0], [1, 1], [0, 1]]}},
     ),
+    ("PUT", "/api/roi"): (
+        200,
+        {"roi": {"status": "defined", "points": [[0, 0], [1, 0], [1, 1], [0, 1]]}},
+    ),
     ("DELETE", "/api/roi"): (204, None),
     ("GET", "/api/grid"): (200, {"grid": {"enabled": True, "rows": 3, "columns": 3}}),
     ("PUT", "/api/grid"): (200, {"grid": {"enabled": True, "rows": 4, "columns": 6}}),

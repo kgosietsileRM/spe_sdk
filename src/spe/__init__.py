@@ -56,6 +56,8 @@ from .geometry import (
 )
 from .grid import GridConfig, generate_calibrated_grid, generate_grid
 from .models import BoundingBox, Calibration, Detection, GridCell, ReferencePlane, Zone
+from .motion import MotionConfig, SpatialTrackStateManager
+from .observations import create_image_observation, create_observation
 from .spatial import (
     image_to_spatial,
     inspect_point,
@@ -64,6 +66,7 @@ from .spatial import (
     spatialize_detection,
     spatialize_detection_result,
 )
+from .tracking import ModelAgnosticTracker, TrackingConfig
 from .transport import Transport, UrllibTransport, get_default_transport
 from .zones import generate_zones, row_label, zone_for_cell
 
@@ -111,6 +114,13 @@ __all__ = [
     "row_label",
     "generate_zones",
     "zone_for_cell",
+    # tracking, motion & observations
+    "ModelAgnosticTracker",
+    "TrackingConfig",
+    "MotionConfig",
+    "SpatialTrackStateManager",
+    "create_observation",
+    "create_image_observation",
     # exceptions
     "SPEError",
     "SPEValidationError",

@@ -24,6 +24,7 @@ htmlcov/
 # Type checkers
 .mypy_cache/
 .ruff_cache/
+.dirac-cache/
 
 # Editors / OS
 .vscode/*

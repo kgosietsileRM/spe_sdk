@@ -51,6 +51,22 @@ def test_async_core_methods(base_url):
     assert media_url.endswith("/media")
 
 
+def test_async_roi_lifecycle(base_url):
+    async def scenario():
+        client = AsyncSPEClient(base_url, retries=0, transport=UrllibTransport())
+        created = await client.create_roi([[0, 0], [10, 0], [10, 10], [0, 10]])
+        updated = await client.update_roi([[0, 0], [10, 0], [10, 10], [0, 10]])
+        current = await client.get_roi()
+        await client.delete_roi()
+        await client.aclose()
+        return created, updated, current
+
+    created, updated, current = _run(scenario())
+    assert created["status"] == "defined"
+    assert updated["status"] == "defined"
+    assert "points" in current
+
+
 def test_async_analysis_and_rendering(base_url):
     async def scenario():
         client = AsyncSPEClient(base_url, transport=UrllibTransport())

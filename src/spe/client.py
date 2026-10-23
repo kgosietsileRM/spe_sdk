@@ -341,6 +341,12 @@ class SPEClient:
             "roi"
         ]
 
+    def update_roi(self, points: Sequence[Sequence[float]]) -> dict[str, Any]:
+        """Replace the active region of interest in place."""
+        return self._request("PUT", "/api/roi", json_body={"points": [list(p) for p in points]})[
+            "roi"
+        ]
+
     def delete_roi(self) -> None:
         self._request("DELETE", "/api/roi")
 

@@ -175,6 +175,9 @@ class AsyncSPEClient:
     async def create_roi(self, points: Sequence[Sequence[float]]) -> dict[str, Any]:
         return await self._call("create_roi", points)
 
+    async def update_roi(self, points: Sequence[Sequence[float]]) -> dict[str, Any]:
+        return await self._call("update_roi", points)
+
     async def delete_roi(self) -> None:
         await self._call("delete_roi")
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `spe.tracking` (`ModelAgnosticTracker`, `TrackingConfig`): provider-neutral
+  multi-object association with stable track ids and lifecycle diagnostics.
+- `spe.motion` (`SpatialTrackStateManager`, `MotionConfig`): bounded
+  trajectories, finite-difference velocity/direction, and optional prediction.
+- `spe.observations` (`create_observation`, `create_image_observation`):
+  timestamped, provider-neutral observation builders that preserve spatial and
+  track data.
+- `SPEClient.update_roi` / `AsyncSPEClient.update_roi` for `PUT /api/roi`,
+  completing coverage of the engine's ROI routes.
+
 ## [0.1.0] - 2026-10-17
 
 ### Added

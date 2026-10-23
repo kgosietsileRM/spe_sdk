@@ -239,6 +239,7 @@ Runnable scripts live under [`examples/`](https://github.com/kgosietsileRM/spe_s
 | [`warehouse_grid_inventory.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/warehouse_grid_inventory.py) | Bay occupancy map, empty-bay list, and fill ratio from pallet detections. |
 | [`traffic_lane_speed.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/traffic_lane_speed.py) | A metric reference plane (`units="meters"`) for lane assignment and speed. |
 | [`annotated_overlay.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/annotated_overlay.py) | Rendering the calibrated grid plus zone-labelled boxes to a PNG. |
+| [`tracking_and_motion.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/tracking_and_motion.py) | Stable track ids, per-track speed, and next-position prediction. |
 | [`http_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_client.py) | Talking to a running engine with the synchronous client. |
 | [`async_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/async_client.py) | The asyncio client (`AsyncSPEClient`). |
 | [`http_analysis_session.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_analysis_session.py) | A full server analysis session: health, source, frames, complete. |
@@ -259,6 +260,9 @@ The full, exhaustive reference is in [`docs/index.md`](https://github.com/kgosie
 | Spatial | `inspect_point`, `image_to_spatial`, `point_in_roi`, `spatial_point_to_grid_cell`, `spatialize_detection`, `spatialize_detection_result` |
 | Rendering | `GridConfig`, `generate_grid`, `generate_calibrated_grid` |
 | Zones | `row_label`, `generate_zones`, `zone_for_cell` |
+| Tracking | `ModelAgnosticTracker`, `TrackingConfig` |
+| Motion | `SpatialTrackStateManager`, `MotionConfig` |
+| Observations | `create_observation`, `create_image_observation` |
 | Errors | `SPEError`, `SPEValidationError`, `SPEEngineError`, `SPEModelUnavailableError`, `SPETransportError`, `SPEConnectionError`, `SPETimeoutError`, `SPEAPIError` |
 
 ## Development
@@ -272,10 +276,11 @@ mypy                  # types (config in pyproject.toml)
 pytest --cov=spe      # tests + coverage
 ```
 
-The suite covers geometry, inspection, zones, the engine facade, value objects,
-the sync and async HTTP clients (against a local mock server), the transports,
-and the CLI. Linting, formatting, and strict type checking all pass, with line
-coverage held at ~99%. See [`CONTRIBUTING.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/CONTRIBUTING.md) for the quality
+The suite covers geometry, inspection, zones, tracking, motion, observations, the
+engine facade, value objects, the sync and async HTTP clients (against a local mock
+server), the transports, and the CLI. Linting, formatting, and strict type checking
+all pass, with line coverage held at ~99%. See
+[`CONTRIBUTING.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/CONTRIBUTING.md) for the quality
 gates and conventions.
 
 ### Package layout
@@ -292,6 +297,9 @@ src/spe/
 ├── spatial.py        # inspection + detection spatialization
 ├── grid.py           # image-space & calibrated grid rendering
 ├── zones.py          # semantic zone identifiers
+├── tracking.py       # provider-neutral multi-object tracking
+├── motion.py         # trajectories, velocity, direction & prediction
+├── observations.py   # provider-neutral observation builders
 ├── models.py         # typed value objects
 ├── exceptions.py     # SPE error hierarchy
 ├── _version.py       # single source of truth for the version
