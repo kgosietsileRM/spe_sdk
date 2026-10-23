@@ -167,15 +167,19 @@ from spe import SPEClient, get_default_transport
 client = SPEClient(
     "http://127.0.0.1:5000",
     timeout=30.0,  # per-request timeout, seconds
-    retries=2,  # retries for idempotent requests on connection loss
-    backoff=0.5,  # base backoff, doubles each retry
+    retries=2,  # retries for idempotent requests on connection loss or 429/5xx
+    backoff=0.5,  # base backoff, doubles each retry (or the Retry-After value)
     user_agent="my-app/1.0",  # optional User-Agent header
+    api_key="...",  # optional X-API-Key header
+    token="...",  # optional Authorization: Bearer token
+    headers={"X-Trace": "abc"},  # extra headers on every request
     transport=get_default_transport("urllib"),  # force a transport backend
 )
 ```
 
-Read the base URL from the environment with `from_env` (default variable
-`SPE_API_URL`, falling back to `http://127.0.0.1:5000`):
+Read the base URL (and optional credentials) from the environment with
+`from_env` (default variable `SPE_API_URL`, falling back to
+`http://127.0.0.1:5000`; also reads `SPE_API_KEY` and `SPE_API_TOKEN`):
 
 ```python
 from spe import SPEClient, AsyncSPEClient
@@ -212,7 +216,16 @@ All errors derive from `SPEError`:
 | `SPETransportError` | Base class for HTTP transport failures (also a `RuntimeError`). |
 | `SPEConnectionError` | The server cannot be reached. |
 | `SPETimeoutError` | A request exceeded its timeout. |
-| `SPEAPIError` | The server returned an error (`.status_code`, `.payload`, `.url`). |
+| `SPEAPIError` | The server returned an error (`.status_code`, `.payload`, `.url`, `.retry_after`). |
+| `SPEBadRequestError` | HTTP 400: invalid request payload. |
+| `SPEAuthenticationError` | HTTP 401/403: missing or rejected credentials. |
+| `SPENotFoundError` | HTTP 404: the resource does not exist. |
+| `SPEConflictError` | HTTP 409: the server state rejected the request. |
+| `SPERateLimitError` | HTTP 429: the client is being throttled. |
+| `SPEServerError` | HTTP 5xx: a server-side failure. |
+
+The status-specific errors subclass `SPEAPIError`, so existing
+`except SPEAPIError` handlers keep working.
 
 ```python
 from spe import SPEClient, SPEAPIError, SPEError
@@ -240,6 +253,7 @@ Runnable scripts live under [`examples/`](https://github.com/kgosietsileRM/spe_s
 | [`traffic_lane_speed.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/traffic_lane_speed.py) | A metric reference plane (`units="meters"`) for lane assignment and speed. |
 | [`annotated_overlay.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/annotated_overlay.py) | Rendering the calibrated grid plus zone-labelled boxes to a PNG. |
 | [`tracking_and_motion.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/tracking_and_motion.py) | Stable track ids, per-track speed, and next-position prediction. |
+| [`analytics_pipeline.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/analytics_pipeline.py) | Zone occupancy, track summaries, line crossings, and observation persistence. |
 | [`http_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_client.py) | Talking to a running engine with the synchronous client. |
 | [`async_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/async_client.py) | The asyncio client (`AsyncSPEClient`). |
 | [`http_analysis_session.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_analysis_session.py) | A full server analysis session: health, source, frames, complete. |
@@ -254,16 +268,18 @@ The full, exhaustive reference is in [`docs/index.md`](https://github.com/kgosie
 | Local facade | `SpatialEngine` |
 | HTTP clients | `SPEClient`, `AsyncSPEClient` |
 | Uploads | `FileSource` (bytes, path, or binary stream) |
-| Transports | `Transport`, `UrllibTransport`, `get_default_transport` |
-| Value objects | `BoundingBox`, `Detection`, `ReferencePlane`, `GridCell`, `Zone`, `Calibration` |
+| Transports | `Transport`, `UrllibTransport`, `RequestsTransport`, `HttpxTransport`, `get_default_transport` |
+| Value objects | `BoundingBox`, `Detection`, `ReferencePlane`, `GridCell`, `Zone`, `Calibration`, `ModelDescriptor` |
 | Geometry | `calculate_calibration`, `calculate_homography`, `transform_points`, `inverse_homography`, `validate_homography`, `validate_source_points`, `reprojection_error`, `warp_image`, `REFERENCE_WIDTH`, `REFERENCE_HEIGHT`, `POINT_ORDER` |
 | Spatial | `inspect_point`, `image_to_spatial`, `point_in_roi`, `spatial_point_to_grid_cell`, `spatialize_detection`, `spatialize_detection_result` |
 | Rendering | `GridConfig`, `generate_grid`, `generate_calibrated_grid` |
+| Inference | `InferenceContext`, `resolve_inference_context` |
 | Zones | `row_label`, `generate_zones`, `zone_for_cell` |
 | Tracking | `ModelAgnosticTracker`, `TrackingConfig` |
 | Motion | `SpatialTrackStateManager`, `MotionConfig` |
-| Observations | `create_observation`, `create_image_observation` |
-| Errors | `SPEError`, `SPEValidationError`, `SPEEngineError`, `SPEModelUnavailableError`, `SPETransportError`, `SPEConnectionError`, `SPETimeoutError`, `SPEAPIError` |
+| Analytics | `ZoneOccupancyTracker`, `LineCrossingCounter`, `TrackSummary`, `summarize_tracks` |
+| Observations | `create_observation`, `create_image_observation`, `ObservationBatchWriter` |
+| Errors | `SPEError`, `SPEValidationError`, `SPEEngineError`, `SPEModelUnavailableError`, `SPETransportError`, `SPEConnectionError`, `SPETimeoutError`, `SPEAPIError`, `SPEBadRequestError`, `SPEAuthenticationError`, `SPENotFoundError`, `SPEConflictError`, `SPERateLimitError`, `SPEServerError` |
 
 ## Development
 

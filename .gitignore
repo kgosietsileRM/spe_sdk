@@ -37,3 +37,4 @@ Thumbs.db
 *.log
 outputs/local/
 examples/output/
+examples/assets/

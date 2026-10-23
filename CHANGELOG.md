@@ -18,6 +18,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   track data.
 - `SPEClient.update_roi` / `AsyncSPEClient.update_roi` for `PUT /api/roi`,
   completing coverage of the engine's ROI routes.
+- `spe.inference` (`InferenceContext`, `resolve_inference_context`): validated
+  whole-source and four-point ROI inference scopes.
+- `spe.analytics` (`ZoneOccupancyTracker`, `LineCrossingCounter`, `TrackSummary`,
+  `summarize_tracks`): per-zone occupancy/dwell, directional tripwire counts,
+  and per-track summaries.
+- `ObservationBatchWriter`: opt-in JSON Lines persistence with batched writes
+  and a manifest under a caller-chosen root.
+- `ModelDescriptor` and `SPEClient.models()` / `AsyncSPEClient.models()` for
+  typed model metadata, including capabilities and tracking modes.
+- `SpatialEngine.zone_polygons()` and `SpatialEngine.detections_in_zone()` for
+  source-space zone overlays and filtering.
+- `BoundingBox` geometry helpers: `area`, `x2`/`y2`, `as_xyxy`, `from_xyxy`,
+  `intersection`, `iou`, `union`, `contains`, `translate`, and `scale`.
+- Status-specific API errors (`SPEBadRequestError`, `SPEAuthenticationError`,
+  `SPENotFoundError`, `SPEConflictError`, `SPERateLimitError`, `SPEServerError`)
+  that subclass `SPEAPIError`.
+- Optional client authentication (`api_key`, `token`, `headers`) and
+  environment support (`SPE_API_KEY`, `SPE_API_TOKEN`).
+- CLI commands `spatialize`, `track`, and `render-grid`, plus `models
+  --descriptors` and global `--api-key`, `--timeout`, and `--compact` options.
+- `examples/analytics_pipeline.py` demonstrating tracks, zones, line crossings,
+  and observation persistence.
+
+### Changed
+
+- Idempotent requests now also retry HTTP 429/502/503/504, honoring the
+  server's `Retry-After` header.
+- `health`, `get_state`, `detect`, and `detect_frame` accept a per-call
+  `timeout=` override.
 
 ## [0.1.0] - 2026-10-17
 

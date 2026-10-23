@@ -474,3 +474,133 @@ def test_decode_handles_empty_and_non_json():
     assert SPEClient._decode(b"") is None
     assert SPEClient._decode(b"not json") == b"not json"
     assert SPEClient._decode(b'{"a": 1}') == {"a": 1}
+
+
+# -- transport, retries, and error taxonomy --------------------------------
+class _FakeTransport:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def request(self, method, url, *, headers, data, timeout):
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": dict(headers),
+                "data": data,
+                "timeout": timeout,
+            }
+        )
+        return self.responses.pop(0)
+
+    def close(self):
+        return None
+
+
+def test_retryable_status_honors_retry_after():
+    transport = _FakeTransport(
+        [
+            (503, {"Retry-After": "0"}, b'{"error": "busy"}'),
+            (200, {"Content-Type": "application/json"}, b'{"status": "ok"}'),
+        ]
+    )
+    client = SPEClient("http://example.test", retries=1, backoff=0, transport=transport)
+    assert client.health() == {"status": "ok"}
+    assert len(transport.calls) == 2
+    assert transport.calls[0]["timeout"] == 30.0
+
+
+def test_retryable_status_eventually_raises_typed_error():
+    from spe import SPERateLimitError
+
+    transport = _FakeTransport([(429, {"Retry-After": "0"}, b'{"error": "slow"}')] * 2)
+    client = SPEClient("http://example.test", retries=1, backoff=0, transport=transport)
+    with pytest.raises(SPERateLimitError) as caught:
+        client.health()
+    assert caught.value.status_code == 429
+    assert caught.value.retry_after == 0.0
+    assert caught.value.response_headers["Retry-After"] == "0"
+
+
+def test_post_503_is_not_retried():
+    from spe import SPEServerError
+
+    transport = _FakeTransport([(503, {}, b'{"error": "down"}')])
+    client = SPEClient("http://example.test", retries=5, backoff=0, transport=transport)
+    with pytest.raises(SPEServerError):
+        client._request("POST", "/api/analysis/detect", json_body={"a": 1})
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("status", "error_type"),
+    [
+        (400, "SPEBadRequestError"),
+        (401, "SPEAuthenticationError"),
+        (403, "SPEAuthenticationError"),
+        (404, "SPENotFoundError"),
+        (409, "SPEConflictError"),
+        (429, "SPERateLimitError"),
+        (500, "SPEServerError"),
+        (418, "SPEAPIError"),
+    ],
+)
+def test_api_error_taxonomy(status, error_type):
+    from spe import SPEAPIError
+
+    error = SPEClient._api_error(status, b'{"error": "x"}', "http://y")
+    assert isinstance(error, SPEAPIError)
+    assert type(error).__name__ == error_type
+    assert error.status_code == status
+
+
+def test_auth_and_custom_headers(base_url, server):
+    client = SPEClient(
+        base_url,
+        retries=0,
+        transport=UrllibTransport(),
+        headers={"X-Trace": "abc"},
+        api_key="key-1",
+        token="token-1",
+    )
+    client.health()
+    headers = {key.lower(): value for key, value in server.requests[-1]["headers"].items()}
+    assert headers["x-api-key"] == "key-1"
+    assert headers["authorization"] == "Bearer token-1"
+    assert headers["x-trace"] == "abc"
+
+
+def test_from_env_reads_credentials(monkeypatch):
+    monkeypatch.setenv("SPE_API_URL", "http://example.test:9000")
+    monkeypatch.setenv("SPE_API_KEY", "env-key")
+    monkeypatch.setenv("SPE_API_TOKEN", "env-token")
+    client = SPEClient.from_env(transport=UrllibTransport())
+    assert client._headers["X-API-Key"] == "env-key"
+    assert client._headers["Authorization"] == "Bearer env-token"
+
+
+def test_models_returns_typed_descriptors(client):
+    models = client.models()
+    assert models[0].id == "model-a"
+    assert models[0].name == "Model A"
+    assert models[0].provider == "ultralytics"
+    assert isinstance(models[0].to_dict(), dict)
+
+
+def test_per_call_timeout_is_forwarded():
+    transport = _FakeTransport([(200, {}, b'{"status": "ok"}'), (200, {}, b'{"status": "ok"}')])
+    client = SPEClient("http://example.test", transport=transport)
+    client.health(timeout=1.25)
+    assert transport.calls[0]["timeout"] == 1.25
+    client.health()
+    assert transport.calls[1]["timeout"] == 30.0
+
+
+def test_retry_after_invalid_values_are_ignored():
+    from spe.client import _retry_after
+
+    assert _retry_after({"Retry-After": "later"}) is None
+    assert _retry_after({"retry-after": "-1"}) is None
+    assert _retry_after({"retry-after": "2.5"}) == 2.5
+    assert _retry_after({}) is None

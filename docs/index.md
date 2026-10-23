@@ -16,6 +16,8 @@ quick-start examples, see the [README](../README.md).
 - [Grid reference](#grid-reference)
 - [Zones reference](#zones-reference)
 - [Tracking, motion and observations](#tracking-motion-and-observations)
+- [Inference contexts](#inference-contexts)
+- [Analytics](#analytics)
 - [`SPEClient`](#speclient)
 - [`AsyncSPEClient`](#asyncspeclient)
 - [Transports](#transports)
@@ -230,6 +232,8 @@ Inspects one image-space point against the installed state. See
 | `spatialize_detection(detection)` | Enrich one detection mapping with spatial data. |
 | `spatialize_result(result)` | Enrich a normalized `{"detections": [...]}` result. |
 | `spatialize(detections)` | Enrich a sequence of detection mappings, returning a list. |
+| `zone_polygons()` | Map each zone id to its source-pixel quadrilateral. |
+| `detections_in_zone(detections, zone)` | Return spatialized detections in one zone. |
 
 These require a calibration and raise `SPEEngineError` when uncalibrated. The
 per-detection payload matches [`spatialize_detection`](#spatialize_detection).
@@ -316,6 +320,15 @@ Validation: `x`/`y` must be `>= 0`; `width`/`height` must be `> 0`.
 | `x`, `y`, `width`, `height` | `float` | Box geometry. |
 | `center` (property) | `dict[str, float]` | `{"x": ..., "y": ...}` box center. |
 | `foot_point` (property) | `dict[str, float]` | Bottom-center `{"x": ..., "y": ...}`. |
+| `area`, `x2`, `y2` (properties) | `float` | Area and right/bottom edges. |
+| `as_xyxy()` | `tuple[float, float, float, float]` | `(x1, y1, x2, y2)` bounds. |
+| `from_xyxy(x1, y1, x2, y2)` | `BoundingBox` | Classmethod; builds from corners. |
+| `intersection(other)` | `BoundingBox \| None` | Overlapping box, or `None`. |
+| `iou(other)` | `float` | Intersection-over-union in `[0, 1]`. |
+| `union(other)` | `BoundingBox` | Smallest enclosing box. |
+| `contains(point, *, strict=False)` | `bool` | Point-in-box test; accepts a mapping or `(x, y)`. |
+| `translate(dx, dy)` | `BoundingBox` | Shifted copy. |
+| `scale(factor)` | `BoundingBox` | Copy scaled about its center. |
 | `to_dict()` | `dict` | `{"x", "y", "width", "height"}`. |
 | `from_dict(data)` | `BoundingBox` | Classmethod. |
 
@@ -779,6 +792,94 @@ create_image_observation(detection_result, *, source_id: str) -> dict
 
 Wraps one static-image detection result with source context.
 
+### `ObservationBatchWriter`
+
+```python
+ObservationBatchWriter(
+    analysis_id: str,
+    source_id: str,
+    model: Mapping[str, Any],
+    *,
+    root: str | Path,
+    batch_size: int = 25,
+    interval_ms: float | None = None,
+    effective_fps: float | None = None,
+)
+writer.append(observation) -> None
+writer.flush() -> Path | None
+writer.update_sampling(interval_ms, effective_fps) -> None
+writer.close(status="complete") -> None
+```
+
+Opt-in persistence. Writes `root/<analysis_id>/observations.jsonl` and an
+adjacent `manifest.json`; nothing is written unless you instantiate the writer.
+It appends to an existing file so resumed runs keep prior records, and rejects
+path separators in identifiers.
+
+## Inference contexts
+
+`spe.inference` validates the source-space scope used by model providers.
+
+```python
+InferenceContext.whole_source() -> InferenceContext
+InferenceContext.region_of_interest(points) -> InferenceContext
+InferenceContext.from_dict(data) -> InferenceContext
+context.to_dict() -> dict
+resolve_inference_context(context, width, height) -> dict
+```
+
+`resolve_inference_context` accepts a mapping, an `InferenceContext`, or `None`
+and returns the engine-compatible dict. A ROI must be exactly four finite points
+inside the frame with non-degenerate area; otherwise `SPEValidationError` is
+raised.
+
+```python
+from spe import InferenceContext, resolve_inference_context
+
+context = InferenceContext.region_of_interest([[120, 80], [880, 110], [940, 520], [60, 540]])
+payload = resolve_inference_context(context, 1000, 600)
+client.detect_frame(frame, inference_context=payload)
+```
+
+## Analytics
+
+`spe.analytics` builds summaries on top of tracked, spatialized detections. It is
+pure Python and accepts the engine's JSON shapes.
+
+### `ZoneOccupancyTracker`
+
+```python
+tracker.update(detections, timestamp=None) -> dict
+tracker.snapshot() -> dict
+tracker.reset() -> None
+```
+
+Tracks per-zone occupancy, entry counts, and dwell seconds by `track_id`
+(falling back to `id`). Zones are read from `spatial.zone`, then `zone`.
+
+### `LineCrossingCounter`
+
+```python
+LineCrossingCounter(start, end, *, name="line", max_events=1000)
+counter.update(detections) -> dict
+counter.snapshot() -> dict
+counter.reset() -> None
+```
+
+Counts directional track crossings over a virtual line. Positions prefer
+`spatial.position`, then `position`, `foot_point`, `center`, or the bbox foot
+point. `positive` means a counter-clockwise transit; `negative` the reverse.
+
+### `summarize_tracks`
+
+```python
+summarize_tracks(frames, *, distance_units="source_pixels") -> list[dict]
+```
+
+Consumes `{"timestamp", "detections"}` frames and returns one `TrackSummary`
+per track with duration, frames, distance, average speed, visited zones, and
+start/end positions. All positions must share a coordinate space.
+
 ## `SPEClient`
 
 `spe.client.SPEClient` is a thin, typed client for a running SPE engine server.
@@ -916,6 +1017,7 @@ The rendering methods return `{"image": ..., "metadata": {...}}`.
 | Method | Route | Returns |
 | --- | --- | --- |
 | `list_models()` | `GET /api/models` | `response["models"]`. |
+| `models()` | `GET /api/models` | Typed `ModelDescriptor` objects. |
 | `get_model(model_id)` | `GET /api/models/{id}` | `response["model"]`. |
 | `model_status(model_id)` | `GET /api/models/{id}/status` | Raw payload. |
 | `load_model(model_id)` | `POST /api/models/{id}/load` | Raw payload. |
@@ -1052,26 +1154,34 @@ raises `ValueError`.
 Installed as the `spe` console script; also runnable as `python -m spe`.
 
 ```text
-spe [--url URL] [--version] {health,state,models,inspect,calibrate} ...
+spe [--url URL] [--api-key KEY] [--timeout SECONDS] [--compact] [--version]
+    {health,state,models,inspect,calibrate,spatialize,track,render-grid} ...
 ```
 
 | Command | Description | Options |
 | --- | --- | --- |
 | `health` | Check server health. | — |
 | `state` | Fetch the master spatial state. | — |
-| `models` | List registered perception models. | — |
+| `models` | List registered perception models. | `--descriptors` (typed output) |
 | `inspect` | Inspect a point against a calibration file. | `--x FLOAT`, `--y FLOAT`, `--calibration PATH`, `--size WxH` (default `1000x600`), `--rows INT` (3), `--columns INT` (3) |
 | `calibrate` | Calculate a calibration from four points. | `--size WxH` (required), `--points X,Y X,Y X,Y X,Y` (required), `--rows INT` (3), `--columns INT` (3), `--reference WxH` (`1000x600`), `--units STR` (`normalized`) |
+| `spatialize` | Add spatial data to detections JSON. | `--calibration PATH` (required), `--detections PATH` (required), `--rows INT`, `--columns INT` |
+| `track` | Track a JSON list of frames. | `--frames PATH` (required), `--min-iou FLOAT`, `--max-distance-scale FLOAT`, `--max-missing FLOAT`, `--confirmation INT` |
+| `render-grid` | Draw a grid onto an image. | `--image PATH` (required), `--output PATH` (required), `--calibration PATH`, `--rows INT` (8), `--columns INT` (12), `--thickness INT` (1) |
 
-Global options: `--url` (default `http://127.0.0.1:5000`) and `--version`
-(prints `spe-sdk <version>`). Points may be written with either commas or
-semicolons. Errors print `error: ...` to stderr and return exit code `1`.
+Global options: `--url` (default `http://127.0.0.1:5000`), `--api-key`,
+`--timeout` (30 seconds), `--compact` (compact JSON), and `--version` (prints
+`spe-sdk <version>`). Points may be written with either commas or semicolons.
+Errors print `error: ...` to stderr and return exit code `1`.
 
 ```bash
 spe --url http://127.0.0.1:5000 health
 spe state
 spe calibrate --size 1280x720 --points 180,120 1090,150 1180,640 90,660 --rows 4 --columns 6
 spe inspect --x 640 --y 360 --calibration calibration.json --size 1280x720
+spe spatialize --calibration calibration.json --detections frames.json
+spe track --frames frames.json
+spe render-grid --image frame.jpg --output annotated.png --rows 4 --columns 6
 spe --version
 ```
 
@@ -1089,9 +1199,16 @@ All errors derive from `SPEError`.
 | `SPEConnectionError` | `SPETransportError` | The server cannot be reached. |
 | `SPETimeoutError` | `SPETransportError` | A request exceeded its timeout. |
 | `SPEAPIError` | `SPEError` | The server returned an error. |
+| `SPEBadRequestError` | `SPEAPIError` | HTTP 400: invalid request payload. |
+| `SPEAuthenticationError` | `SPEAPIError` | HTTP 401/403: missing or rejected credentials. |
+| `SPENotFoundError` | `SPEAPIError` | HTTP 404: the resource does not exist. |
+| `SPEConflictError` | `SPEAPIError` | HTTP 409: the server state rejected the request. |
+| `SPERateLimitError` | `SPEAPIError` | HTTP 429: the client is being throttled. |
+| `SPEServerError` | `SPEAPIError` | HTTP 5xx: a server-side failure. |
 
-`SPEAPIError` exposes `status_code: int | None`, `payload: Any | None`, and
-`url: str | None`.
+`SPEAPIError` exposes `status_code: int | None`, `payload: Any | None`,
+`url: str | None`, `retry_after: float | None`, and `response_headers: dict`.
+The status-specific subclasses keep `except SPEAPIError` handlers valid.
 
 ## Development
 

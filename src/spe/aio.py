@@ -25,6 +25,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .client import FileSource, SPEClient
+from .models import ModelDescriptor
 from .transport import Transport
 
 __all__ = ["AsyncSPEClient"]
@@ -45,6 +46,9 @@ class AsyncSPEClient:
         backoff: float = 0.5,
         user_agent: str | None = None,
         transport: Transport | None = None,
+        headers: Mapping[str, str] | None = None,
+        api_key: str | None = None,
+        token: str | None = None,
     ) -> None:
         self._client = SPEClient(
             base_url,
@@ -53,6 +57,9 @@ class AsyncSPEClient:
             backoff=backoff,
             user_agent=user_agent,
             transport=transport,
+            headers=headers,
+            api_key=api_key,
+            token=token,
         )
 
     # -- context management ------------------------------------------------
@@ -300,6 +307,10 @@ class AsyncSPEClient:
     # -- models & analysis -------------------------------------------------
     async def list_models(self) -> list[dict[str, Any]]:
         return await self._call("list_models")
+
+    async def models(self) -> list[ModelDescriptor]:
+        """List registered models as typed descriptors."""
+        return await self._call("models")
 
     async def get_model(self, model_id: str) -> dict[str, Any]:
         return await self._call("get_model", model_id)

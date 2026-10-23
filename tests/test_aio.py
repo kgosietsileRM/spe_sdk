@@ -203,3 +203,38 @@ def test_async_detect_frame(base_url):
 
     result = _run(scenario())
     assert result["model"]["id"] == "model-a"
+
+
+def test_async_models_returns_descriptors(base_url):
+    async def scenario():
+        client = AsyncSPEClient(base_url, retries=0, transport=UrllibTransport())
+        try:
+            return await client.models()
+        finally:
+            await client.aclose()
+
+    models = _run(scenario())
+    assert models[0].id == "model-a"
+    assert models[0].supports_tracking is False
+
+
+def test_async_auth_headers(base_url, server):
+    async def scenario():
+        client = AsyncSPEClient(
+            base_url,
+            retries=0,
+            transport=UrllibTransport(),
+            api_key="k",
+            token="t",
+            headers={"X-Trace": "v"},
+        )
+        try:
+            await client.health()
+        finally:
+            await client.aclose()
+
+    _run(scenario())
+    headers = {key.lower(): value for key, value in server.requests[-1]["headers"].items()}
+    assert headers["x-api-key"] == "k"
+    assert headers["authorization"] == "Bearer t"
+    assert headers["x-trace"] == "v"

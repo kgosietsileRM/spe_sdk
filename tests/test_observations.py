@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from spe import create_image_observation, create_observation
@@ -87,3 +89,57 @@ def test_observation_rejects_invalid_timestamp_and_frame_index():
 def test_image_observation_requires_source_id():
     with pytest.raises(SPEValidationError, match="source identifier"):
         create_image_observation(_result(), source_id=" ")
+
+
+def _observation(index: int) -> dict:
+    return {"observation_id": f"obs-{index}", "frame_index": index}
+
+
+def test_batch_writer_flushes_and_writes_manifest(tmp_path):
+    from spe import ObservationBatchWriter
+
+    writer = ObservationBatchWriter(
+        "run-1", "src-1", {"id": "model-a"}, root=tmp_path, batch_size=2, interval_ms=40.0
+    )
+    assert writer.append(_observation(0)) is None
+    assert writer.flush() == writer.path
+    assert writer.flush() is None
+    writer.append(_observation(1))
+    writer.append(_observation(2))
+    writer.update_sampling(50.0, 20.0)
+    writer.close()
+
+    lines = writer.path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 3
+    manifest = json.loads(writer.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["observation_count"] == 3
+    assert manifest["status"] == "complete"
+    assert manifest["interval_ms"] == 50.0
+    assert manifest["effective_fps"] == 20.0
+
+
+def test_batch_writer_appends_and_context_manager(tmp_path):
+    from spe import ObservationBatchWriter
+
+    with ObservationBatchWriter("run-1", "src-1", {}, root=tmp_path) as writer:
+        writer.append(_observation(0))
+    with ObservationBatchWriter("run-1", "src-1", {}, root=tmp_path, batch_size=1) as writer:
+        assert writer._count == 1
+        writer.append(_observation(1))
+    assert len(writer.path.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_batch_writer_validates_paths_and_arguments(tmp_path):
+    from spe import ObservationBatchWriter
+
+    with pytest.raises(SPEValidationError, match="analysis_id"):
+        ObservationBatchWriter("../escape", "src", {}, root=tmp_path)
+    with pytest.raises(SPEValidationError, match="source_id"):
+        ObservationBatchWriter("run", "", {}, root=tmp_path)
+    with pytest.raises(SPEValidationError, match="batch_size"):
+        ObservationBatchWriter("run", "src", {}, root=tmp_path, batch_size=0)
+    writer = ObservationBatchWriter("run", "src", {}, root=tmp_path)
+    with pytest.raises(SPEValidationError, match="observation mapping"):
+        writer.append({})
+    with pytest.raises(SPEValidationError, match="Status"):
+        writer.close("unknown")

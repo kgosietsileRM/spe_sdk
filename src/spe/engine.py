@@ -135,6 +135,46 @@ class SpatialEngine:
         """Return every zone for the configured calibrated grid."""
         return [Zone.from_dict(zone) for zone in generate_zones(self.grid_rows, self.grid_columns)]
 
+    def zone_polygons(self) -> dict[str, list[list[float]]]:
+        """Return each zone's source-pixel polygon, keyed by zone id.
+
+        The polygon is the grid cell projected back through the calibration's
+        inverse homography, which makes it directly usable for overlays and
+        point-in-zone tests in image space.
+        """
+        calibration = self._require_calibration()
+        plane = calibration.reference_plane
+        cell_width = plane.width / self.grid_columns
+        cell_height = plane.height / self.grid_rows
+        polygons: dict[str, list[list[float]]] = {}
+        for zone in generate_zones(self.grid_rows, self.grid_columns):
+            row = int(zone["row"])
+            column = int(zone["column"])
+            left = column * cell_width
+            top = row * cell_height
+            reference_corners = [
+                [left, top],
+                [left + cell_width, top],
+                [left + cell_width, top + cell_height],
+                [left, top + cell_height],
+            ]
+            polygons[zone["id"]] = calibration.reference_to_image(reference_corners)
+        return polygons
+
+    def detections_in_zone(
+        self,
+        detections: Sequence[Mapping[str, Any]],
+        zone: str,
+    ) -> list[dict[str, Any]]:
+        """Return spatialized detections whose calibrated zone matches *zone*."""
+        if zone not in {item.id for item in self.zones()}:
+            raise SPEValidationError(f"Unknown zone: {zone!r}.")
+        return [
+            spatialized
+            for spatialized in self.spatialize(detections)
+            if spatialized.get("zone") == zone
+        ]
+
     # -- inspection --------------------------------------------------------
     def spatial_state(self) -> dict[str, Any]:
         """Return the canonical state contract consumed by :func:`inspect_point`."""

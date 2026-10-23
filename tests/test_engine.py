@@ -163,3 +163,35 @@ def test_from_dict_without_calibration():
     engine = SpatialEngine.from_dict({"grid_rows": 2, "grid_columns": 2})
     assert engine.is_calibrated is False
     assert engine.grid_rows == 2
+
+
+def test_zone_polygons_are_projected_into_image_space(engine):
+    polygons = engine.zone_polygons()
+    assert len(polygons) == 9
+    assert set(polygons) == {zone.id for zone in engine.zones()}
+    for polygon in polygons.values():
+        assert len(polygon) == 4
+        for x, y in polygon:
+            assert -1 <= x <= SOURCE_WIDTH + 1
+            assert -1 <= y <= SOURCE_HEIGHT + 1
+
+
+def test_detections_in_zone_filters_and_validates(engine):
+    polygon = engine.zone_polygons()["A1"]
+    center_x = sum(point[0] for point in polygon) / 4
+    center_y = sum(point[1] for point in polygon) / 4
+    detection = {
+        "class_name": "person",
+        "bbox": {"x": center_x - 5, "y": center_y - 10, "width": 10, "height": 10},
+    }
+    found = engine.detections_in_zone([detection], "A1")
+    assert len(found) == 1
+    assert found[0]["zone"] == "A1"
+    assert engine.detections_in_zone([detection], "C3") == []
+    with pytest.raises(SPEValidationError, match="Unknown zone"):
+        engine.detections_in_zone([detection], "Z9")
+
+
+def test_zone_polygons_require_calibration():
+    with pytest.raises(SPEEngineError):
+        SpatialEngine().zone_polygons()

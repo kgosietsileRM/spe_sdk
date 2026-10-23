@@ -44,6 +44,98 @@ class BoundingBox:
     def foot_point(self) -> dict[str, float]:
         return {"x": self.x + self.width / 2, "y": self.y + self.height}
 
+    @property
+    def area(self) -> float:
+        """Return the box area in squared source-pixel units."""
+        return float(self.width * self.height)
+
+    @property
+    def x2(self) -> float:
+        """Return the right edge coordinate."""
+        return self.x + self.width
+
+    @property
+    def y2(self) -> float:
+        """Return the bottom edge coordinate."""
+        return self.y + self.height
+
+    def as_xyxy(self) -> tuple[float, float, float, float]:
+        """Return ``(x1, y1, x2, y2)`` bounds."""
+        return (self.x, self.y, self.x2, self.y2)
+
+    @classmethod
+    def from_xyxy(cls, x1: float, y1: float, x2: float, y2: float) -> BoundingBox:
+        """Build a box from top-left and bottom-right corners."""
+        if float(x2) <= float(x1) or float(y2) <= float(y1):
+            raise SPEValidationError("Bounding box x2/y2 must be greater than x1/y1.")
+        return cls(
+            x=float(x1), y=float(y1), width=float(x2) - float(x1), height=float(y2) - float(y1)
+        )
+
+    def intersection(self, other: BoundingBox) -> BoundingBox | None:
+        """Return the overlapping box, or ``None`` when the boxes do not overlap."""
+        left = max(self.x, other.x)
+        top = max(self.y, other.y)
+        right = min(self.x2, other.x2)
+        bottom = min(self.y2, other.y2)
+        if right <= left or bottom <= top:
+            return None
+        return BoundingBox(x=left, y=top, width=right - left, height=bottom - top)
+
+    def iou(self, other: BoundingBox) -> float:
+        """Return the intersection-over-union ratio in ``[0, 1]``."""
+        overlap = self.intersection(other)
+        intersection = overlap.area if overlap else 0.0
+        union = self.area + other.area - intersection
+        return intersection / union if union else 0.0
+
+    def union(self, other: BoundingBox) -> BoundingBox:
+        """Return the smallest box enclosing both boxes."""
+        return BoundingBox.from_xyxy(
+            min(self.x, other.x),
+            min(self.y, other.y),
+            max(self.x2, other.x2),
+            max(self.y2, other.y2),
+        )
+
+    def contains(self, point: Mapping[str, Any] | Sequence[float], *, strict: bool = False) -> bool:
+        """Return whether a point lies inside the box.
+
+        Args:
+            point: Mapping with ``x``/``y`` keys or a two-item ``(x, y)`` sequence.
+            strict: When true, points on the border are excluded.
+        """
+        if isinstance(point, Mapping):
+            x, y = float(point["x"]), float(point["y"])
+        else:
+            values = list(point)
+            if len(values) != 2:
+                raise SPEValidationError("Point must contain exactly two coordinates.")
+            x, y = float(values[0]), float(values[1])
+        if strict:
+            return self.x < x < self.x2 and self.y < y < self.y2
+        return self.x <= x <= self.x2 and self.y <= y <= self.y2
+
+    def translate(self, dx: float, dy: float) -> BoundingBox:
+        """Return a copy shifted by ``(dx, dy)`` pixels."""
+        return BoundingBox(
+            x=self.x + float(dx), y=self.y + float(dy), width=self.width, height=self.height
+        )
+
+    def scale(self, factor: float) -> BoundingBox:
+        """Return a copy scaled about its center by ``factor``."""
+        if float(factor) <= 0:
+            raise SPEValidationError("Scale factor must be positive.")
+        center = self.center
+        width = self.width * float(factor)
+        height = self.height * float(factor)
+        return BoundingBox(
+            x=center["x"] - width / 2,
+            y=center["y"] - height / 2,
+            width=width,
+            height=height,
+        )
+
     def to_dict(self) -> dict[str, float]:
         return {"x": self.x, "y": self.y, "width": self.width, "height": self.height}
 
@@ -304,11 +396,78 @@ class Calibration:
         return zone_for_cell(cell.to_dict() if cell else None, self.rows, self.columns)
 
 
+@dataclass(frozen=True)
+class ModelDescriptor:
+    """Typed metadata for a registered perception model.
+
+    Mirrors the engine's ``ModelDescriptor`` contract so callers can branch on
+    capabilities (for example, whether a model supports temporal tracking)
+    without inspecting raw JSON.
+    """
+
+    id: str
+    name: str
+    provider: str = ""
+    version: str = ""
+    description: str = ""
+    capabilities: tuple[str, ...] = ("object_detection",)
+    tracking_modes: tuple[str, ...] = ()
+    status: str = "unavailable"
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if not str(self.id).strip():
+            raise SPEValidationError("Model id is required.")
+        if not str(self.name).strip() or not str(self.provider).strip():
+            raise SPEValidationError("Model name and provider are required.")
+        if self.status not in {"registered", "available", "unavailable", "error"}:
+            raise SPEValidationError(f"Unsupported model status: {self.status}")
+
+    @property
+    def supports_tracking(self) -> bool:
+        """Return whether the model advertises any temporal tracking mode."""
+        return bool(self.tracking_modes) or "tracking" in self.capabilities
+
+    def supports(self, capability: str) -> bool:
+        """Return whether *capability* is advertised by the model."""
+        return capability in self.capabilities
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "provider": self.provider,
+            "version": self.version,
+            "description": self.description,
+            "capabilities": list(self.capabilities),
+            "tracking_modes": list(self.tracking_modes),
+            "status": self.status,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ModelDescriptor:
+        return cls(
+            id=str(data["id"]),
+            name=str(data.get("name", data["id"])),
+            provider=str(data.get("provider") or "unknown"),
+            version=str(data.get("version", "")),
+            description=str(data.get("description", "")),
+            capabilities=tuple(
+                str(item) for item in data.get("capabilities") or ("object_detection",)
+            ),
+            tracking_modes=tuple(str(item) for item in data.get("tracking_modes") or ()),
+            status=str(data.get("status", "unavailable")),
+            reason=data.get("reason"),
+        )
+
+
 __all__ = [
     "BoundingBox",
     "Calibration",
     "Detection",
     "GridCell",
+    "ModelDescriptor",
     "ReferencePlane",
     "Zone",
 ]

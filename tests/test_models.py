@@ -9,6 +9,7 @@ from spe import (
     Calibration,
     Detection,
     GridCell,
+    ModelDescriptor,
     ReferencePlane,
     SPEValidationError,
     Zone,
@@ -104,3 +105,74 @@ def test_calibration_without_homography_raises():
         calibration.image_to_reference([[0, 0]])
     with pytest.raises(SPEValidationError):
         calibration.reference_to_image([[0, 0]])
+
+
+def test_bounding_box_geometry_helpers():
+    box = BoundingBox(10, 20, 40, 30)
+    assert box.area == 1200
+    assert (box.x2, box.y2) == (50, 50)
+    assert box.as_xyxy() == (10, 20, 50, 50)
+    assert BoundingBox.from_xyxy(10, 20, 50, 50) == box
+    assert box.contains({"x": 30, "y": 40})
+    assert box.contains([10, 20])
+    assert not box.contains([50, 50], strict=True)
+    assert box.translate(5, -10).to_dict() == {"x": 15, "y": 10, "width": 40, "height": 30}
+    scaled = BoundingBox(100, 100, 40, 30).scale(2)
+    assert scaled.to_dict() == {"x": 80, "y": 85, "width": 80, "height": 60}
+
+
+def test_bounding_box_intersection_union_and_iou():
+    first = BoundingBox(0, 0, 10, 10)
+    second = BoundingBox(5, 5, 10, 10)
+    overlap = first.intersection(second)
+    assert overlap is not None
+    assert overlap.to_dict() == {"x": 5, "y": 5, "width": 5, "height": 5}
+    assert first.iou(second) == pytest.approx(25 / 175)
+    assert first.union(second).to_dict() == {"x": 0, "y": 0, "width": 15, "height": 15}
+    assert first.intersection(BoundingBox(20, 20, 5, 5)) is None
+    assert first.iou(BoundingBox(20, 20, 5, 5)) == 0.0
+
+
+def test_bounding_box_validation_helpers():
+    with pytest.raises(SPEValidationError):
+        BoundingBox.from_xyxy(10, 10, 5, 20)
+    with pytest.raises(SPEValidationError):
+        BoundingBox(0, 0, 10, 10).scale(0)
+    with pytest.raises(SPEValidationError):
+        BoundingBox(0, 0, 10, 10).contains([1, 2, 3])
+
+
+def test_model_descriptor_round_trip_and_capabilities():
+    descriptor = ModelDescriptor.from_dict(
+        {
+            "id": "model-a",
+            "name": "Model A",
+            "provider": "ultralytics",
+            "version": "1",
+            "description": "detector",
+            "capabilities": ["object_detection", "tracking"],
+            "tracking_modes": ["iou"],
+            "status": "available",
+        }
+    )
+    assert descriptor.supports("tracking")
+    assert not descriptor.supports("segmentation")
+    assert descriptor.supports_tracking
+    payload = descriptor.to_dict()
+    assert payload["capabilities"] == ["object_detection", "tracking"]
+    assert payload["tracking_modes"] == ["iou"]
+    assert ModelDescriptor.from_dict(payload) == descriptor
+
+
+def test_model_descriptor_defaults_and_validation():
+    descriptor = ModelDescriptor.from_dict({"id": "m"})
+    assert descriptor.name == "m"
+    assert descriptor.provider == "unknown"
+    assert descriptor.capabilities == ("object_detection",)
+    assert not descriptor.supports_tracking
+    with pytest.raises(SPEValidationError):
+        ModelDescriptor(id=" ", name="x", provider="p")
+    with pytest.raises(SPEValidationError):
+        ModelDescriptor(id="m", name="x", provider="")
+    with pytest.raises(SPEValidationError):
+        ModelDescriptor(id="m", name="x", provider="p", status="broken")

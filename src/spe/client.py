@@ -22,11 +22,51 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, BinaryIO
 
-from .exceptions import SPEAPIError, SPETransportError, SPEValidationError
+from .exceptions import (
+    SPEAPIError,
+    SPEAuthenticationError,
+    SPEBadRequestError,
+    SPEConflictError,
+    SPENotFoundError,
+    SPERateLimitError,
+    SPEServerError,
+    SPETransportError,
+    SPEValidationError,
+)
+from .models import ModelDescriptor
 from .transport import Transport, get_default_transport
 
 FileSource = bytes | bytearray | memoryview | str | os.PathLike | BinaryIO
 _IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "PUT", "DELETE", "OPTIONS"})
+_RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+_ERROR_TYPES: tuple[tuple[frozenset[int], type[SPEAPIError]], ...] = (
+    (frozenset({400}), SPEBadRequestError),
+    (frozenset({401, 403}), SPEAuthenticationError),
+    (frozenset({404}), SPENotFoundError),
+    (frozenset({409}), SPEConflictError),
+    (frozenset({429}), SPERateLimitError),
+)
+
+
+def _header(headers: Mapping[str, str], name: str) -> str | None:
+    """Case-insensitive header lookup for backends that preserve original casing."""
+    lowered = name.lower()
+    for key, value in headers.items():
+        if key.lower() == lowered:
+            return value
+    return None
+
+
+def _retry_after(headers: Mapping[str, str]) -> float | None:
+    """Parse a ``Retry-After`` header expressed in seconds."""
+    value = _header(headers, "Retry-After")
+    if value is None:
+        return None
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
 
 
 def _read_binary(source: FileSource, filename: str | None = None) -> tuple[bytes, str]:
@@ -88,6 +128,9 @@ class SPEClient:
         user_agent: Optional ``User-Agent`` header.
         transport: Optional custom :class:`~spe.transport.Transport`; defaults to
             the best available backend.
+        headers: Extra headers sent with every request.
+        api_key: Optional API key sent as ``X-API-Key``.
+        token: Optional bearer token sent as ``Authorization: Bearer ...``.
     """
 
     def __init__(
@@ -99,6 +142,9 @@ class SPEClient:
         backoff: float = 0.5,
         user_agent: str | None = None,
         transport: Transport | None = None,
+        headers: Mapping[str, str] | None = None,
+        api_key: str | None = None,
+        token: str | None = None,
     ) -> None:
         if not base_url or not isinstance(base_url, str):
             raise SPEValidationError("base_url must be a non-empty string.")
@@ -107,6 +153,11 @@ class SPEClient:
         self.retries = max(0, int(retries))
         self.backoff = max(0.0, float(backoff))
         self._user_agent = user_agent
+        self._headers = dict(headers or {})
+        if token:
+            self._headers.setdefault("Authorization", f"Bearer {token}")
+        if api_key:
+            self._headers.setdefault("X-API-Key", api_key)
         self._transport = transport or get_default_transport()
 
     # -- context management ------------------------------------------------
@@ -122,7 +173,13 @@ class SPEClient:
 
     @classmethod
     def from_env(cls, variable: str = "SPE_API_URL", **kwargs: Any) -> SPEClient:
-        """Create a client from an environment variable base URL."""
+        """Create a client from environment variables.
+
+        Reads ``SPE_API_URL`` for the base URL and, unless supplied explicitly,
+        ``SPE_API_KEY`` and ``SPE_API_TOKEN`` for authentication.
+        """
+        kwargs.setdefault("api_key", os.environ.get("SPE_API_KEY"))
+        kwargs.setdefault("token", os.environ.get("SPE_API_TOKEN"))
         return cls(os.environ.get(variable, "http://127.0.0.1:5000"), **kwargs)
 
     # -- transport ---------------------------------------------------------
@@ -171,9 +228,10 @@ class SPEClient:
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
         raw: bool = False,
         retries: int | None = None,
+        timeout: float | None = None,
     ) -> Any:
         url = self._url(path, params)
-        headers: dict[str, str] = {"Accept": "application/json"}
+        headers: dict[str, str] = {"Accept": "application/json", **self._headers}
         data: bytes | None = None
         if files:
             content_type, data = self._encode_multipart(fields or {}, files)
@@ -185,16 +243,17 @@ class SPEClient:
             data = urllib.parse.urlencode(fields).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         if self._user_agent:
-            headers["User-Agent"] = self._user_agent
+            headers.setdefault("User-Agent", self._user_agent)
 
         attempts = self.retries if retries is None else max(0, int(retries))
         if method not in _IDEMPOTENT_METHODS:
             attempts = 0
+        request_timeout = self.timeout if timeout is None else float(timeout)
         last_error: Exception | None = None
         for attempt in range(attempts + 1):
             try:
                 status, response_headers, payload = self._transport.request(
-                    method, url, headers=headers, data=data, timeout=self.timeout
+                    method, url, headers=headers, data=data, timeout=request_timeout
                 )
             except SPETransportError as error:
                 last_error = error
@@ -202,10 +261,14 @@ class SPEClient:
                     time.sleep(self.backoff * (2**attempt))
                 continue
             if status >= 400:
-                raise self._api_error(status, payload, url)
+                if status in _RETRYABLE_STATUS and attempt < attempts:
+                    delay = _retry_after(response_headers)
+                    time.sleep(self.backoff * (2**attempt) if delay is None else delay)
+                    continue
+                raise self._api_error(status, payload, url, response_headers)
             if raw:
                 return payload
-            return self._decode(payload, response_headers.get("Content-Type"))
+            return self._decode(payload, _header(response_headers, "Content-Type"))
         raise last_error  # type: ignore[misc]
 
     @staticmethod
@@ -218,7 +281,12 @@ class SPEClient:
             return payload
 
     @staticmethod
-    def _api_error(status: int, body: bytes, url: str) -> SPEAPIError:
+    def _api_error(
+        status: int,
+        body: bytes,
+        url: str,
+        response_headers: Mapping[str, str] | None = None,
+    ) -> SPEAPIError:
         payload: Any | None = None
         message = f"HTTP {status} from {url}"
         try:
@@ -227,16 +295,29 @@ class SPEClient:
                 message = str(payload["error"])
         except (UnicodeDecodeError, json.JSONDecodeError):
             payload = body or None
-        return SPEAPIError(message, status_code=status, payload=payload, url=url)
+        headers = dict(response_headers or {})
+        error_type: type[SPEAPIError] = SPEServerError if status >= 500 else SPEAPIError
+        for statuses, candidate in _ERROR_TYPES:
+            if status in statuses:
+                error_type = candidate
+                break
+        return error_type(
+            message,
+            status_code=status,
+            payload=payload,
+            url=url,
+            retry_after=_retry_after(headers),
+            response_headers=headers,
+        )
 
     # -- health & state ----------------------------------------------------
-    def health(self) -> dict[str, Any]:
+    def health(self, *, timeout: float | None = None) -> dict[str, Any]:
         """Return the server health payload."""
-        return self._request("GET", "/health")
+        return self._request("GET", "/health", timeout=timeout)
 
-    def get_state(self) -> dict[str, Any]:
+    def get_state(self, *, timeout: float | None = None) -> dict[str, Any]:
         """Return the canonical master spatial state."""
-        return self._request("GET", "/api/state")
+        return self._request("GET", "/api/state", timeout=timeout)
 
     # -- sources -----------------------------------------------------------
     def create_source(
@@ -500,6 +581,10 @@ class SPEClient:
     def list_models(self) -> list[dict[str, Any]]:
         return self._request("GET", "/api/models")["models"]
 
+    def models(self) -> list[ModelDescriptor]:
+        """List registered models as typed :class:`~spe.models.ModelDescriptor` objects."""
+        return [ModelDescriptor.from_dict(item) for item in self.list_models()]
+
     def get_model(self, model_id: str) -> dict[str, Any]:
         return self._request("GET", f"/api/models/{model_id}")["model"]
 
@@ -522,6 +607,7 @@ class SPEClient:
         confidence: float = 0.4,
         classes: Sequence[str] | None = None,
         source_id: str | None = None,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
         """Run detection on the active (or specified) image source."""
         payload: dict[str, Any] = {"model_id": model_id, "confidence": float(confidence)}
@@ -529,7 +615,7 @@ class SPEClient:
             payload["classes"] = list(classes)
         if source_id is not None:
             payload["source_id"] = source_id
-        return self._request("POST", "/api/analysis/detect", json_body=payload)
+        return self._request("POST", "/api/analysis/detect", json_body=payload, timeout=timeout)
 
     def detect_frame(
         self,
@@ -551,6 +637,7 @@ class SPEClient:
         spatial_context: Mapping[str, Any] | None = None,
         interval_ms: float | None = None,
         effective_fps: float | None = None,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
         """Detect and (optionally) track, spatialize, and timestamp one frame."""
         data, _ = _read_binary(frame, filename)
@@ -584,6 +671,7 @@ class SPEClient:
             "/api/analysis/detect-frame",
             fields=fields,
             files={"frame": (filename, data, _content_type(filename))},
+            timeout=timeout,
         )
 
     def start_analysis_session(
