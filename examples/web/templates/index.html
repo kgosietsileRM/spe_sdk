@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Highway Incident Console</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span>HWY</span><span>OPS</span>
+      </div>
+      <div class="brand-copy">
+        <h1>Highway Incident Console</h1>
+        <p>Mainline monitoring and response coordination</p>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-block">
+        <span>Feed</span>
+        <strong id="feed-name">—</strong>
+      </div>
+      <div class="meta-block">
+        <span>Detection</span>
+        <strong id="detection-label">Local</strong>
+      </div>
+      <div class="clock-block">
+        <span>Local time</span>
+        <strong id="clock">--:--:--</strong>
+      </div>
+      <div class="connection" id="connection">
+        <i id="connection-dot" aria-hidden="true"></i>
+        <span id="connection-label">Standby</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="rail rail-left">
+      <section class="panel deployment">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">Deployment</span>
+            <h2>Camera assignment</h2>
+          </div>
+          <span class="tag">CAM 02</span>
+        </div>
+        <form id="run-form" autocomplete="off">
+          <label class="field">Camera feed
+            <select id="source" name="source">
+              {% set source_labels = {'live': 'Live camera · YouTube', 'online': 'Remote sample', 'hd': 'Recorded · 720p', 'fullHd': 'Recorded · 1080p'} %}
+              {% for key in sources %}
+              <option value="{{ key }}" {% if key == default_source %}selected{% endif %}>{{ source_labels.get(key, key) }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">Lane preset
+            <select id="preset" name="preset">
+              {% for key, preset in presets.items() %}
+              <option value="{{ key }}" {% if key == default_preset %}selected{% endif %}>{{ preset.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="field-row">
+            <label class="field"><span id="frames-label">Sample frames</span>
+              <input id="frames" type="number" min="20" max="300" step="10" value="120">
+            </label>
+            <label class="field">Sample rate
+              <input id="fps" type="number" min="1" max="15" step="0.5" value="5">
+            </label>
+          </div>
+          <details class="settings">
+            <summary>Detection settings</summary>
+            <label class="field">Mode
+              <select id="mode">
+                <option value="local">Local video analysis</option>
+                <option value="server">SPE engine endpoint</option>
+              </select>
+            </label>
+            <label class="field">Engine URL
+              <input id="url" type="url" value="http://127.0.0.1:5000">
+            </label>
+            <div class="field-row">
+              <label class="field">Model
+                <input id="model" type="text" value="model-a">
+              </label>
+              <label class="field">Confidence
+                <input id="confidence" type="number" min="0" max="1" step="0.05" value="0.4">
+              </label>
+            </div>
+          </details>
+          <div class="form-actions">
+            <button id="run" class="primary" type="submit">Start monitoring</button>
+            <button id="cancel" class="danger-ghost" type="button" hidden>Stop</button>
+          </div>
+          <p id="form-error" class="form-error" role="alert" hidden></p>
+        </form>
+        <div class="run-progress">
+          <div class="progress-meta">
+            <span id="run-state">Standby</span>
+            <span id="progress-text" class="mono">0%</span>
+          </div>
+          <div class="progress-track"><div id="progress-bar"></div></div>
+          <div class="progress-meta dim">
+            <span id="run-frames">0 / 0 frames</span>
+            <span id="run-elapsed" class="mono">00:00</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel recent">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">Activity</span>
+            <h2>Recent deployments</h2>
+          </div>
+          <span id="session-count" class="tag">0</span>
+        </div>
+        <div id="session-list" class="session-list">
+          <p class="empty">No completed deployments.</p>
+        </div>
+      </section>
+    </aside>
+
+    <section class="center-column">
+      <section class="panel theater">
+        <div class="theater-head">
+          <div>
+            <span class="eyebrow" id="stage-eyebrow">Standby</span>
+            <h2 id="stage-title">Camera preview</h2>
+          </div>
+          <div class="stage-actions">
+            <span id="stage-chip" class="status-chip">STANDBY</span>
+            <a id="report-link" class="ghost-link" href="#" hidden>Export report</a>
+          </div>
+        </div>
+        <div class="frame-wrap" id="frame-wrap">
+          <img id="frame" alt="Annotated mainline camera view">
+          <div class="frame-placeholder" id="placeholder">
+            <div class="placeholder-mark" aria-hidden="true"></div>
+            <p>Select a camera feed to preview the monitored lanes.</p>
+          </div>
+          <div class="frame-overlay" id="frame-overlay">
+            <div class="overlay-row overlay-top">
+              <span id="overlay-camera">CAM 02 · MAINLINE</span>
+              <span id="overlay-time" class="mono">--:--:--</span>
+            </div>
+            <div class="overlay-row overlay-bottom">
+              <span id="overlay-frame" class="mono">NO SIGNAL</span>
+              <span id="overlay-source" class="mono">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="transport">
+          <button id="play-toggle" class="play-button" type="button" disabled aria-label="Play replay">
+            <svg viewBox="0 0 12 14" aria-hidden="true"><path id="play-icon" d="M1 1l10 6-10 6z"></path></svg>
+          </button>
+          <div class="scrub-wrap">
+            <div id="incident-marks" class="incident-marks" aria-hidden="true"></div>
+            <input id="scrubber" type="range" min="0" max="0" value="0" step="1" disabled aria-label="Replay position">
+          </div>
+          <span id="play-clock" class="mono play-clock">00:00 / 00:00</span>
+        </div>
+      </section>
+
+      <section class="panel lane-panel">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">Mainline</span>
+            <h2>Lane status</h2>
+          </div>
+          <span id="lane-summary" class="hint">Awaiting telemetry</span>
+        </div>
+        <div id="lane-cards" class="lane-cards"></div>
+      </section>
+
+      <section class="analytics-grid">
+        <section class="panel chart-panel">
+          <div class="panel-title compact">
+            <div>
+              <span class="eyebrow">Telemetry</span>
+              <h2>Congestion trend</h2>
+            </div>
+            <div id="congestion-legend" class="legend"></div>
+          </div>
+          <div id="congestion-chart" class="chart" role="img" aria-label="Congestion trend by lane"></div>
+        </section>
+        <section class="panel chart-panel">
+          <div class="panel-title compact">
+            <div>
+              <span class="eyebrow">Demand</span>
+              <h2>Queue and occupancy</h2>
+            </div>
+            <div class="legend legend-muted"><span><i class="swatch swatch-queue"></i>Queue</span><span><i class="swatch swatch-occupancy"></i>Occupancy</span></div>
+          </div>
+          <div id="queue-chart" class="chart" role="img" aria-label="Queue and occupancy trend"></div>
+        </section>
+      </section>
+    </section>
+
+    <aside class="rail rail-right">
+      <section class="kpi-grid">
+        <article class="kpi">
+          <span>Active vehicles</span>
+          <strong id="kpi-active">0</strong>
+          <small id="kpi-active-sub">No feed</small>
+        </article>
+        <article class="kpi">
+          <span>Congestion index</span>
+          <strong id="kpi-congestion">0</strong>
+          <small id="kpi-congestion-sub">Normal range</small>
+        </article>
+        <article class="kpi">
+          <span>Relative speed</span>
+          <strong id="kpi-speed">0</strong>
+          <small>Indexed to calibration</small>
+        </article>
+        <article class="kpi alert-kpi">
+          <span>Open incidents</span>
+          <strong id="kpi-incidents">0</strong>
+          <small id="kpi-incidents-sub">No active alerts</small>
+        </article>
+      </section>
+
+      <section class="panel advisory-panel">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">Operations</span>
+            <h2>Response advisory</h2>
+          </div>
+          <span id="advisory-state" class="status-chip normal">NORMAL</span>
+        </div>
+        <div class="advisory-grid">
+          <div><span>Priority</span><strong id="advisory-priority">LOW</strong></div>
+          <div><span>Ramp metering</span><strong id="advisory-metering">OPEN</strong></div>
+        </div>
+        <ul id="advisory-actions" class="action-list">
+          <li>Maintain normal operations</li>
+        </ul>
+        <p id="advisory-reasons" class="advisory-reason">No active alerts; flow within normal range</p>
+        <details class="policy">
+          <summary>Policy thresholds</summary>
+          <label class="slider">Stopped speed
+            <input id="policy-stopped" type="range" min="10" max="150" step="5" value="55">
+            <output id="policy-stopped-out">55</output>
+          </label>
+          <label class="slider">Stopped duration
+            <input id="policy-duration" type="range" min="0.5" max="5" step="0.5" value="1.5">
+            <output id="policy-duration-out">1.5 s</output>
+          </label>
+          <label class="slider">Congestion alert
+            <input id="policy-congestion" type="range" min="50" max="95" step="5" value="70">
+            <output id="policy-congestion-out">70</output>
+          </label>
+          <button id="policy-apply" class="secondary" type="button" disabled>Recalculate advisory</button>
+        </details>
+      </section>
+
+      <section class="panel incidents-panel">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">Log</span>
+            <h2>Incident log</h2>
+          </div>
+          <span id="incident-count" class="tag">0</span>
+        </div>
+        <div id="incident-list" class="incident-list">
+          <p class="empty">No incidents detected.</p>
+        </div>
+      </section>
+
+      <section class="panel zone-panel">
+        <div class="panel-title compact">
+          <div>
+            <span class="eyebrow">Calibration</span>
+            <h2>Zone occupancy</h2>
+          </div>
+          <span id="zone-caption" class="tag">LIVE</span>
+        </div>
+        <div id="zone-map" class="zone-map"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span>Highway operations · spatial traffic analytics</span>
+    <span>Simulation output for review and planning; not for live control.</span>
+  </footer>
+
+  <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

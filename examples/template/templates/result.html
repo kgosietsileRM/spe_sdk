@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}SPE report{% endblock %}
+{% block heading %}Report ready{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>{{ settings.preset_name }} · {{ report.source.width }}×{{ report.source.height }}</h2>
+  <div class="meta">
+    <span class="pill good">{{ report.mode }} mode</span>
+    <span class="pill">{{ report.sampled_frames }} frames</span>
+    <span class="pill">{{ report.occupancy.active_tracks }} active tracks</span>
+    <span class="pill">{{ report.tracks | length }} track summaries</span>
+  </div>
+  {% if frame_json %}
+  <img class="preview" src="{{ url_for('last_frame') }}?v={{ report.sampled_frames }}" alt="Annotated frame">
+  {% endif %}
+  <div class="actions">
+    <a href="{{ url_for('download') }}">Download JSON</a>
+    <a href="{{ url_for('index') }}">Run another</a>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Lane summary</h2>
+  <table>
+    <thead><tr><th>Lane</th><th>Queue</th><th>Occupancy</th><th>Crossings</th></tr></thead>
+    <tbody>
+      {% for lane, stats in report.lanes.items() %}
+      <tr><td>{{ lane }}</td><td>{{ stats.queue }}</td><td>{{ stats.occupancy }}</td><td>{{ stats.crossings }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h2 style="margin-top:22px">Zones</h2>
+  <table>
+    <thead><tr><th>Zone</th><th>Occupancy</th><th>Entries</th><th>Dwell (s)</th></tr></thead>
+    <tbody>
+      {% for zone, stats in report.occupancy.zones.items() %}
+      <tr><td>{{ zone }}</td><td>{{ stats.occupancy }}</td><td>{{ stats.entries }}</td><td>{{ stats.dwell_seconds }}</td></tr>
+      {% else %}
+      <tr><td colspan="4" class="note">No detections landed in a calibrated zone.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card" style="grid-column:1 / -1">
+  <h2>Rendered JSON</h2>
+  <pre>{{ report | tojson(indent=2) }}</pre>
+</section>
+{% endblock %}

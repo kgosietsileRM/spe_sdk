@@ -37,4 +37,8 @@ Thumbs.db
 *.log
 outputs/local/
 examples/output/
-examples/assets/
+examples/assets/*
+!examples/assets/link.json
+!examples/assets/*.whl
+!examples/assets/*.tar.gz
+!examples/assets/README.md

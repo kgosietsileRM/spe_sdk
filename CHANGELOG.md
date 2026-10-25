@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   --descriptors` and global `--api-key`, `--timeout`, and `--compact` options.
 - `examples/analytics_pipeline.py` demonstrating tracks, zones, line crossings,
   and observation persistence.
+- Four stand-alone demo apps (`examples/cli`, `examples/powershell`,
+  `examples/template`, `examples/web`) that install the built wheel into their
+  own virtual environments and cover interactive CLIs, batch automation,
+  template-driven JSON, and adaptive traffic-signal recommendations.
 
 ### Changed
 

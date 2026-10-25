@@ -23,6 +23,7 @@ quick-start examples, see the [README](../README.md).
 - [Transports](#transports)
 - [Command line](#command-line)
 - [Exceptions](#exceptions)
+- [Stand-alone demos](#stand-alone-demos)
 - [Development](#development)
 
 ## Installation
@@ -1209,6 +1210,21 @@ All errors derive from `SPEError`.
 `SPEAPIError` exposes `status_code: int | None`, `payload: Any | None`,
 `url: str | None`, `retry_after: float | None`, and `response_headers: dict`.
 The status-specific subclasses keep `except SPEAPIError` handlers valid.
+
+## Stand-alone demos
+
+Four runnable applications live under `examples/` and install the built wheel
+from `examples/assets` into their own virtual environments. They never import
+from `src/`, which makes them practical proof that the package works as a
+normal dependency.
+
+- `examples/cli` � interactive media shell with lane analytics and overlays.
+- `examples/powershell` � PowerShell bootstrap around a `.bat` batch analyzer.
+- `examples/template` � Flask studio with spatial presets and Jinja JSON output.
+- `examples/web` � adaptive traffic-signal console with queue-pressure green
+  time recommendations and a what-if cycle slider.
+
+See each folder's `README.md` for setup, commands, and output locations.
 
 ## Development
 

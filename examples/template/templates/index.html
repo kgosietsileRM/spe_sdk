@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}SPE template studio{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>New report</h2>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for _category, message in messages %}<div class="flash">{{ message }}</div>{% endfor %}
+  {% endwith %}
+  <form method="post" action="{{ url_for('analyze') }}" enctype="multipart/form-data">
+    <label for="source">Media from assets/link.json</label>
+    <select id="source" name="source">
+      {% for key, value in sources.items() %}
+      <option value="{{ key }}">{{ key }} — {{ value }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="media">Or upload a video</label>
+    <input id="media" type="file" name="media" accept="video/*">
+
+    <label for="preset">Output template</label>
+    <select id="preset" name="preset">
+      {% for key, preset in presets.items() %}
+      <option value="{{ key }}">{{ preset.name }} ({{ preset.rows }}×{{ preset.columns }})</option>
+      {% endfor %}
+    </select>
+
+    <div class="row">
+      <div>
+        <label for="frames">Max frames</label>
+        <input id="frames" type="number" name="frames" value="60" min="1" max="2000">
+      </div>
+      <div>
+        <label for="fps">Sample FPS</label>
+        <input id="fps" type="number" name="fps" value="5" min="0.1" max="30" step="0.1">
+      </div>
+    </div>
+
+    <label for="mode">Detection mode</label>
+    <select id="mode" name="mode">
+      <option value="local">Local OpenCV motion detection</option>
+      <option value="server">SPE server detect endpoint</option>
+    </select>
+
+    <div class="row">
+      <div>
+        <label for="url">Server URL</label>
+        <input id="url" type="url" name="url" value="http://127.0.0.1:5000">
+      </div>
+      <div>
+        <label for="model">Model</label>
+        <input id="model" type="text" name="model" value="model-a">
+      </div>
+    </div>
+
+    <button type="submit">Analyze + render JSON</button>
+  </form>
+  <p class="note">The JSON response uses a Jinja template (<code>report.json.j2</code>) so output shape is consistent across clips. API clients can call <code>/api/analyze</code> directly.</p>
+</section>
+
+<section class="card">
+  <h2>Last result</h2>
+  {% if last_report %}
+  <div class="actions">
+    <a href="{{ url_for('last_frame') }}">View annotated frame</a>
+    <a href="{{ url_for('download') }}">Download JSON</a>
+    <a href="{{ url_for('api_analyze') }}?source=hd&amp;preset=highway&amp;frames=10">Quick API example</a>
+  </div>
+  {% else %}
+  <p class="note">No report yet. Run an analysis to see the annotated frame and downloadable JSON.</p>
+  {% endif %}
+  <h2 style="margin-top:22px">Template presets</h2>
+  <table>
+    <thead><tr><th>Preset</th><th>Grid</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for key, preset in presets.items() %}
+      <tr><td>{{ key }}</td><td>{{ preset.rows }}×{{ preset.columns }}</td><td class="note">{{ preset.description }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

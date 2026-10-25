@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SPE template studio{% endblock %}</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1220; --panel:#131d31; --line:#263656; --text:#e6edf8; --muted:#93a4c3; --accent:#38d39f; --warn:#ffb454; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background:radial-gradient(1200px 600px at 80% -10%, #16305a 0%, var(--bg) 55%); color:var(--text); }
+    header { padding:28px clamp(16px, 5vw, 64px) 10px; }
+    h1 { margin:0 0 6px; font-size:clamp(24px, 3vw, 38px); letter-spacing:-0.03em; }
+    p.lede { margin:0; color:var(--muted); max-width:70ch; }
+    main { padding: 18px clamp(16px, 5vw, 64px) 64px; display:grid; gap:22px; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); align-items:start; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    .card { background:linear-gradient(180deg, rgba(25,38,62,.96), rgba(17,27,46,.96)); border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:0 18px 50px rgba(0,0,0,.28); }
+    h2 { margin:0 0 14px; font-size:17px; letter-spacing:.01em; }
+    label { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:14px 0 6px; }
+    input, select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0d1729; color:var(--text); font:inherit; }
+    input[type=file] { padding:8px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    button { margin-top:18px; width:100%; padding:12px 16px; border:0; border-radius:12px; background:linear-gradient(135deg, var(--accent), #2bb9d8); color:#04151a; font-weight:700; font-size:15px; cursor:pointer; }
+    button:hover { filter:brightness(1.06); }
+    .note { color:var(--muted); font-size:13px; line-height:1.5; }
+    .flash { margin:0 0 16px; padding:10px 14px; border-radius:10px; background:#3a1a22; border:1px solid #7c2a3a; color:#ffb9c5; }
+    .meta { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+    .pill { padding:5px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); font-size:12px; }
+    .pill.good { color:var(--accent); border-color:#1f6f57; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; padding:9px 8px; border-bottom:1px solid rgba(38,54,86,.7); }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+    pre { margin:0; padding:16px; overflow:auto; max-height:520px; border-radius:12px; background:#08101e; border:1px solid var(--line); font-size:12px; line-height:1.55; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+    .actions a { color:var(--accent); text-decoration:none; border:1px solid #1f6f57; padding:8px 12px; border-radius:10px; font-size:13px; }
+    img.preview { width:100%; border-radius:14px; border:1px solid var(--line); display:block; background:#000; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    @media (max-width: 1100px) { .grid2 { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{% block heading %}SPE template studio{% endblock %}</h1>
+    <p class="lede">Pick media, choose a spatial template, and render a consistent JSON report in one step.</p>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

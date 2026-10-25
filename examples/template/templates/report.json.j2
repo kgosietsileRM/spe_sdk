@@ -1,0 +1,12 @@
+{
+  "source": {{ report.source | tojson }},
+  "mode": {{ report.mode | tojson }},
+  "grid": {{ report.grid | tojson }},
+  "sampled_frames": {{ report.sampled_frames }},
+  "duration_seconds": {{ report.duration_seconds }},
+  "active_tracks": {{ report.occupancy.active_tracks }},
+  "zones": {{ report.occupancy.zones | tojson }},
+  "lanes": {{ report.lanes | tojson }},
+  "crossings": {{ report.crossings | tojson }},
+  "tracks": {{ report.tracks | tojson }}
+}

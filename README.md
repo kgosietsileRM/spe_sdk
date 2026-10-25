@@ -259,6 +259,23 @@ Runnable scripts live under [`examples/`](https://github.com/kgosietsileRM/spe_s
 | [`http_analysis_session.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_analysis_session.py) | A full server analysis session: health, source, frames, complete. |
 | [`stream_video.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/stream_video.py) | Streaming video frames into the detection endpoint with OpenCV. |
 
+### Stand-alone demo apps
+
+Four self-contained apps install the built SDK wheel from `examples/assets` into
+their own virtual environments. They never import from `src/`, so each one
+demonstrates SDK independence end to end.
+
+| Demo | Shows |
+| --- | --- |
+| [`examples/cli`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/cli) | Interactive media shell driven by `assets/link.json`, with lane analytics, overlays, and JSON reports. |
+| [`examples/powershell`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/powershell) | PowerShell bootstrap that invokes a real `.bat` batch analyzer over multiple clips. |
+| [`examples/template`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/template) | Flask studio that applies spatial presets and Jinja JSON templates to media or uploads. |
+| [`examples/web`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/web) | Adaptive traffic-signal console: queue pressure drives green-time recommendations with a what-if cycle slider. |
+
+Run any demo with its `run.ps1` / `run.bat`; the first run bootstraps its local
+`.venv`. The large sample videos stay local and are intentionally gitignored;
+the wheel and `link.json` are tracked so the demos remain installable.
+
 ## API overview
 
 The full, exhaustive reference is in [`docs/index.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md). At a glance:
