@@ -1,1 +1,1 @@
-# No extra packages: the SDK wheel supplies numpy and OpenCV.
+spe-engine==0.2.1

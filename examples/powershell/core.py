@@ -1,8 +1,8 @@
 """Shared, self-contained video analytics for the stand-alone demo apps.
 
 This module is intentionally copied into each demo folder. The demos never
-import from the SDK source tree; they install the built wheel from
-``examples/assets`` into their own virtual environment.
+import from the SDK source tree; each environment installs the published
+``spe-engine`` package from PyPI.
 """
 
 from __future__ import annotations

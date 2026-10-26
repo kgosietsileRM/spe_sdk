@@ -1,4 +1,4 @@
-import { laneColor, renderCongestionChart, renderLegend, renderQueueChart } from "./charts.js";
+import { renderCongestionChart, renderLegend, renderQueueChart } from "./charts.js";
 import { Playback } from "./playback.js";
 
 const $ = (id) => document.getElementById(id);
@@ -7,6 +7,27 @@ const dom = {
   clock: $("clock"),
   feedName: $("feed-name"),
   detectionLabel: $("detection-label"),
+  camCount: $("camCount"),
+  camList: $("camList"),
+  viewTabs: document.querySelector(".view-tabs"),
+  infoView: $("info-view"),
+  aboutView: $("about-view"),
+  chips: $("chips"),
+  searchInput: $("searchInput"),
+  alertCount: $("alertCount"),
+  headerAlerts: $("header-alerts"),
+  wallGrid: $("wallGrid"),
+  wallSub: $("wallSub"),
+  featuredTile: $("featuredTile"),
+  featuredId: $("featured-id"),
+  featuredLive: $("featured-live"),
+  featuredName: $("featured-name"),
+  featuredArea: $("featured-area"),
+  cycleButton: $("cycleBtn"),
+  fullscreenButton: $("fsBtn"),
+  eventStatus: $("event-status"),
+  eventStatusDot: $("event-status-dot"),
+  assignmentTag: $("assignment-tag"),
   connection: $("connection"),
   connectionLabel: $("connection-label"),
   form: $("run-form"),
@@ -44,7 +65,6 @@ const dom = {
   incidentMarks: $("incident-marks"),
   playClock: $("play-clock"),
   laneSummary: $("lane-summary"),
-  laneCards: $("lane-cards"),
   congestionChart: $("congestion-chart"),
   queueChart: $("queue-chart"),
   congestionLegend: $("congestion-legend"),
@@ -53,8 +73,6 @@ const dom = {
   kpiCongestion: $("kpi-congestion"),
   kpiCongestionSub: $("kpi-congestion-sub"),
   kpiSpeed: $("kpi-speed"),
-  kpiIncidents: $("kpi-incidents"),
-  kpiIncidentsSub: $("kpi-incidents-sub"),
   advisoryState: $("advisory-state"),
   advisoryPriority: $("advisory-priority"),
   advisoryMetering: $("advisory-metering"),
@@ -62,8 +80,6 @@ const dom = {
   advisoryReasons: $("advisory-reasons"),
   incidentList: $("incident-list"),
   incidentCount: $("incident-count"),
-  zoneMap: $("zone-map"),
-  zoneCaption: $("zone-caption"),
   sessionList: $("session-list"),
   sessionCount: $("session-count"),
   stopped: $("policy-stopped"),
@@ -84,6 +100,11 @@ const state = {
   advisory: {},
   policy: { stopped_speed: 55, stopped_seconds: 1.5, congestion_high: 70 },
   presets: {},
+  sources: {},
+  cameraFilter: "all",
+  searchTerm: "",
+  cycleTimer: null,
+  view: "info-view",
   fps: 5,
   startedAt: null,
   finishedAt: null,
@@ -149,6 +170,18 @@ function setStage(eyebrow, title, label, kind) {
   setStatusChip(label, kind);
 }
 
+function switchView(viewId) {
+  const showAbout = viewId === "about-view";
+  state.view = showAbout ? "about-view" : "info-view";
+  dom.infoView.hidden = showAbout;
+  dom.aboutView.hidden = !showAbout;
+  dom.viewTabs.querySelectorAll("[data-view]").forEach((button) => {
+    const selected = button.dataset.view === state.view;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
 function setRunningControls(running) {
   for (const element of [dom.source, dom.preset, dom.frames, dom.fps, dom.mode, dom.url, dom.model, dom.confidence]) {
     element.disabled = running;
@@ -195,12 +228,48 @@ function selectedPreset() {
   return state.presets[dom.preset.value] || state.session?.preset || { rows: 2, columns: 3 };
 }
 
+function sourceDisplayName(key) {
+  const match = /^cam(\d+)$/i.exec(key || "");
+  if (match) return `Traffic Camera ${String(Number(match[1])).padStart(2, "0")}`;
+  if ((key || "").toLowerCase() === "video") return "Recorded Traffic Sample";
+  return String(key || "Camera").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function sourceCameraId(key) {
+  const match = /^cam(\d+)$/i.exec(key || "");
+  return match ? `CAM-${String(Number(match[1])).padStart(2, "0")}` : "REC-01";
+}
+
+function sourceIsLive(key) {
+  const value = state.sources[key] || "";
+  return /^(rtsp|rtmp|rtmps|udp):\/\//i.test(value) || /youtube\.com|youtu\.be/i.test(value) || /\.(m3u8|mpd)(\?|$)/i.test(value);
+}
+
+function youtubeId(key) {
+  const value = state.sources[key];
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const id = url.hostname.endsWith("youtu.be")
+      ? url.pathname.slice(1)
+      : url.searchParams.get("v") || url.pathname.match(/\/(?:live|embed|shorts)\/([^/?]+)/)?.[1];
+    return id && /^[\w-]{6,20}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function sourceThumbnail(key) {
+  const id = youtubeId(key);
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "";
+}
+
 function selectedSourceLabel() {
-  return dom.source.options[dom.source.selectedIndex]?.textContent || dom.source.value;
+  return sourceDisplayName(dom.source.value);
 }
 
 function selectedSourceIsLive() {
-  return dom.source.value === "live";
+  return sourceIsLive(dom.source.value);
 }
 
 function updateFramesLabel() {
@@ -215,6 +284,7 @@ async function refreshPreview() {
   const isLive = selectedSourceIsLive();
   const presetName = dom.preset.value;
   const preset = state.presets[presetName] || { name: presetName };
+  syncFeaturedCamera();
   dom.placeholder.hidden = false;
   dom.placeholder.querySelector("p").textContent = isLive ? "Resolving live camera feed…" : "Loading camera preview…";
   dom.frame.classList.remove("visible");
@@ -230,11 +300,151 @@ async function refreshPreview() {
   };
   dom.feedName.textContent = sourceLabel;
   dom.detectionLabel.textContent = dom.mode.value === "local" ? "Local" : "Engine";
-  dom.overlayCamera.textContent = `CAM 02 · ${sourceLabel}`;
+  dom.overlayCamera.textContent = `${sourceCameraId(source)} · ${sourceLabel}`;
   dom.overlayTime.textContent = localClock();
   dom.overlayFrame.textContent = isLive ? "LIVE" : "PREVIEW";
   dom.overlaySource.textContent = `${preset.name || presetName} · ${preset.columns || "—"} lanes`;
   setStage("Preview", `${preset.name || presetName} camera preview`, isLive ? "LIVE" : "PREVIEW", "preview");
+}
+
+async function loadSources() {
+  try {
+    const data = await fetchJson("/api/sources");
+    state.sources = data.sources || {};
+    const selected = dom.source.value;
+    dom.source.innerHTML = Object.keys(state.sources)
+      .map((key) => `<option value="${escapeText(key)}">${escapeText(sourceDisplayName(key))}</option>`)
+      .join("");
+    dom.source.value = state.sources[selected] ? selected : Object.keys(state.sources)[0] || "";
+    renderCameraList();
+    renderWall();
+    updateFramesLabel();
+    syncFeaturedCamera();
+  } catch (error) {
+    dom.camList.innerHTML = `<p class="empty">Could not load camera links: ${escapeText(error.message)}</p>`;
+  }
+}
+
+function renderCameraList() {
+  const selected = dom.source.value;
+  const entries = Object.entries(state.sources).filter(([key]) => {
+    const live = sourceIsLive(key);
+    if (state.cameraFilter === "live" && !live) return false;
+    if (state.cameraFilter === "recorded" && live) return false;
+    if (state.cameraFilter === "alerts") {
+      return key === selected && state.incidents.some((incident) => incident.open);
+    }
+    const text = `${sourceDisplayName(key)} ${key}`.toLowerCase();
+    return !state.searchTerm || text.includes(state.searchTerm);
+  });
+  dom.camCount.textContent = String(Object.keys(state.sources).length);
+  if (!entries.length) {
+    dom.camList.innerHTML = '<p class="empty">No cameras match this filter.</p>';
+    return;
+  }
+  dom.camList.innerHTML = entries.map(([key]) => {
+    const label = sourceDisplayName(key);
+    const id = sourceCameraId(key);
+    const thumbnail = sourceThumbnail(key);
+    const preview = thumbnail
+      ? `<img loading="lazy" src="${thumbnail}" alt=""><span class="thumb-live">STILL</span>`
+      : '<span class="mini-road" aria-hidden="true"></span>';
+    return `<button type="button" class="cam-item${key === selected ? " selected" : ""}" data-source="${escapeText(key)}" aria-pressed="${key === selected}">
+      <span class="thumb">${preview}</span>
+      <span class="ci-body"><span class="ci-name">${escapeText(label)}</span><span class="ci-sub">${id} · ${sourceIsLive(key) ? "YouTube live" : "Recorded sample"}</span></span>
+      <span class="status-dot ${key === selected ? "selected" : "online"}"></span>
+    </button>`;
+  }).join("");
+  dom.camList.querySelectorAll("[data-source]").forEach((button) => {
+    button.addEventListener("click", () => selectSource(button.dataset.source));
+  });
+}
+
+function renderWall() {
+  if (!dom.wallGrid) return;
+  dom.wallGrid.querySelectorAll(".mini-tile").forEach((tile) => tile.remove());
+  const entries = Object.keys(state.sources).filter((key) => key !== dom.source.value);
+  for (const key of entries) {
+    const label = sourceDisplayName(key);
+    const thumbnail = sourceThumbnail(key);
+    const media = thumbnail
+      ? `<div class="mini-media"><img loading="lazy" src="${thumbnail}" alt=""></div>`
+      : '<div class="mini-media"><span class="mini-road" aria-hidden="true"></span></div>';
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "tile mini-tile";
+    tile.dataset.source = key;
+    tile.setAttribute("aria-label", `Feature ${label}`);
+    tile.innerHTML = `${media}<span class="mini-tile-overlay">
+      <span class="mini-tile-top"><span class="cam-id">${sourceCameraId(key)}</span><span class="mini-state">${sourceIsLive(key) ? "STILL" : "REC"}</span></span>
+      <span class="mini-tile-bottom"><span class="mini-name">${escapeText(label)}</span></span>
+    </span>`;
+    tile.addEventListener("click", () => selectSource(key));
+    dom.wallGrid.appendChild(tile);
+  }
+  dom.wallSub.textContent = `${Object.keys(state.sources).length} feeds · selected camera analyzed live`;
+  syncFeaturedCamera();
+}
+
+function syncFeaturedCamera() {
+  if (!dom.featuredTile) return;
+  const key = dom.source.value;
+  const label = sourceDisplayName(key);
+  const active = state.status === "running" && state.session?.source?.key === key;
+  dom.featuredTile.dataset.source = key;
+  dom.featuredId.textContent = sourceCameraId(key);
+  dom.featuredName.textContent = label;
+  dom.featuredArea.textContent = sourceIsLive(key) ? "LIVE CAMERA" : "RECORDED SAMPLE";
+  dom.featuredLive.className = `live-badge ${active ? "active" : "ready"}`;
+  dom.featuredLive.innerHTML = `<i class="rec"></i>${active ? "LIVE" : sourceIsLive(key) ? "READY" : "RECORDED"}`;
+  dom.assignmentTag.textContent = sourceCameraId(key);
+  dom.camList.querySelectorAll("[data-source]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.source === key);
+    const dot = button.querySelector(".status-dot");
+    if (dot) dot.className = `status-dot ${button.dataset.source === key ? "selected" : "online"}`;
+  });
+}
+
+function resetMonitoringView() {
+  state.sessionId = null;
+  state.session = null;
+  state.status = "idle";
+  state.history = [];
+  state.incidents = [];
+  state.advisory = {};
+  state.startedAt = null;
+  state.finishedAt = null;
+  state.cursor = 0;
+  state.syncedPolicy = null;
+  playback.clear();
+  dom.reportLink.hidden = true;
+  dom.policyApply.disabled = true;
+  dom.kpiActive.textContent = "0";
+  dom.kpiActiveSub.textContent = "No feed";
+  dom.kpiCongestion.textContent = "0";
+  dom.kpiCongestionSub.textContent = "Normal range";
+  dom.kpiSpeed.textContent = "0";
+  dom.laneSummary.textContent = "Awaiting telemetry";
+  updateProgress({ status: "idle", progress: 0, sampled_frames: 0, frames_total: 0, live: false });
+  setConnection("", "Standby");
+  renderAdvisory();
+  renderIncidents();
+  renderCharts();
+}
+
+function selectSource(key) {
+  if (!state.sources[key]) return;
+  if (state.busy) {
+    showFormError("Stop the current monitoring session before switching cameras.");
+    return;
+  }
+  if (state.session && state.session.source?.key !== key) resetMonitoringView();
+  dom.source.value = key;
+  showFormError("");
+  updateFramesLabel();
+  renderCameraList();
+  renderWall();
+  refreshPreview();
 }
 
 async function fetchJson(url, options) {
@@ -260,25 +470,31 @@ function applySession(data, { loadReplay = true, syncPolicy = false } = {}) {
   state.startedAt = data.started_at || null;
   state.finishedAt = data.finished_at || null;
   state.fps = Number(data.fps) || state.fps;
+  if (data.source?.key && state.sources[data.source.key]) dom.source.value = data.source.key;
   if (syncPolicy || state.syncedPolicy !== data.id) {
     state.syncedPolicy = data.id;
     state.policy = { ...state.policy, ...(data.policy || {}) };
     applyPolicyControls();
   }
 
-  const sourceName = data.source?.name || data.source?.key || dom.source.value;
+  const sourceName = sourceDisplayName(data.source?.key || dom.source.value);
   dom.feedName.textContent = sourceName;
   dom.detectionLabel.textContent = data.mode === "server" ? "Engine" : "Local";
-  dom.overlayCamera.textContent = `CAM 02 · ${sourceName}`;
+  dom.overlayCamera.textContent = `${sourceCameraId(data.source?.key || dom.source.value)} · ${sourceName}`;
   dom.overlaySource.textContent = data.source?.width
     ? `${data.source.width}×${data.source.height} · ${data.source.fps} FPS`
     : "—";
+  updateFramesLabel();
+  renderCameraList();
+  renderWall();
   updateProgress(data);
+  updateHeaderStats();
 
   if (data.status === "running" || data.status === "queued") {
     setRunningControls(true);
     setConnection("busy", "Monitoring");
     setStage("Live monitoring", `${data.preset?.name || "Mainline"} · ${sourceName}`, "LIVE", "running");
+    syncFeaturedCamera();
     playback.setLive(data.id);
     const latest = state.history[state.history.length - 1];
     if (latest) {
@@ -296,6 +512,7 @@ function applySession(data, { loadReplay = true, syncPolicy = false } = {}) {
 
   setRunningControls(false);
   dom.cancel.hidden = true;
+  syncFeaturedCamera();
   if (data.status === "done") {
     setConnection("live", "Complete");
     setStage("Replay", `${data.preset?.name || "Mainline"} · ${sourceName}`, "COMPLETE", "done");
@@ -355,78 +572,21 @@ function renderSnapshot(snapshot) {
   const lanes = snapshot.lanes || {};
   const active = Number(snapshot.active) || 0;
   const congestion = Number(snapshot.congestion) || 0;
-  const open = (state.incidents || []).filter((item) => item.open).length;
   dom.kpiActive.textContent = String(active);
   dom.kpiActiveSub.textContent = `${Object.keys(lanes).length} lane${Object.keys(lanes).length === 1 ? "" : "s"} monitored`;
   dom.kpiCongestion.textContent = String(Math.round(congestion));
   dom.kpiCongestionSub.textContent = congestionLabel(congestion);
   dom.kpiSpeed.textContent = String(Math.round(Number(snapshot.speed) || 0));
-  dom.kpiIncidents.textContent = String(open);
-  dom.kpiIncidentsSub.textContent = open ? "Response required" : "No active alerts";
-  document.querySelector(".alert-kpi")?.classList.toggle("hot", open > 0);
 
   dom.overlayTime.textContent = `T+${clock(snapshot.t)}`;
   dom.overlayFrame.textContent = `FRAME ${String(snapshot.frame || 0).padStart(4, "0")}`;
   dom.laneSummary.textContent = `${active} vehicles · queue ${snapshot.queue || 0} · congestion ${Math.round(congestion)}`;
-  renderLanes(lanes);
-  renderZoneMap(snapshot.zones || {});
 }
 
-function renderLanes(lanes) {
-  const entries = Object.entries(lanes || {});
-  if (!entries.length) {
-    dom.laneCards.innerHTML = '<p class="empty">Lane telemetry appears when monitoring starts.</p>';
-    return;
-  }
-  const preset = state.session?.preset || selectedPreset();
-  const indices = new Map(entries.map(([lane], index) => [lane, index]));
-  const groups = Array.isArray(preset.groups) && preset.groups.length
-    ? preset.groups
-    : [{ name: "", lanes: entries.map(([lane]) => lane) }];
-  const grouped = new Set(groups.flatMap((group) => group.lanes || []));
-  const sections = groups
-    .map((group) => {
-      const groupEntries = entries.filter(([lane]) => (group.lanes || []).includes(lane));
-      if (!groupEntries.length) return "";
-      const heading = group.name ? `<h3>${escapeText(group.name)}</h3>` : "";
-      return `<section class="lane-group">${heading}<div class="lane-group-grid">${groupEntries
-        .map(([lane, data]) => laneCard(lane, data, indices.get(lane)))
-        .join("")}</div></section>`;
-    })
-    .filter(Boolean);
-  const rest = entries.filter(([lane]) => !grouped.has(lane));
-  if (rest.length) {
-    sections.push(
-      `<section class="lane-group"><div class="lane-group-grid">${rest
-        .map(([lane, data]) => laneCard(lane, data, indices.get(lane)))
-        .join("")}</div></section>`,
-    );
-  }
-  dom.laneCards.innerHTML = sections.join("");
-}
-
-function laneCard(lane, data, index) {
-  const congestion = Number(data.congestion) || 0;
-  const status = laneState(congestion);
-  const color = laneColor(lane, index);
-  return `<article class="lane-card" style="--lane-color:${color}">
-    <div class="lane-head">
-      <span class="lane-name">Lane ${lane}</span>
-      <span class="lane-state ${status.kind}">${status.label}</span>
-    </div>
-    <div class="lane-values">
-      <div><span>Occ</span><strong>${data.occupancy ?? 0}</strong></div>
-      <div><span>Queue</span><strong>${data.queue ?? 0}</strong></div>
-      <div><span>Speed</span><strong>${Math.round(Number(data.speed) || 0)}</strong></div>
-    </div>
-    <div class="lane-bar"><i style="width:${Math.min(100, congestion)}%"></i></div>
-  </article>`;
-}
-
-function laneState(congestion) {
-  if (congestion >= 70) return { label: "CONGESTED", kind: "congested" };
-  if (congestion >= 45) return { label: "WATCH", kind: "watch" };
-  return { label: "NORMAL", kind: "" };
+function updateHeaderStats() {
+  const open = (state.incidents || []).filter((incident) => incident.open).length;
+  dom.alertCount.textContent = String(open);
+  dom.headerAlerts.classList.toggle("has-alerts", open > 0);
 }
 
 function congestionLabel(value) {
@@ -434,24 +594,6 @@ function congestionLabel(value) {
   if (value >= 45) return "Elevated";
   if (value >= 20) return "Guarded";
   return "Normal range";
-}
-
-function renderZoneMap(zones) {
-  const preset = state.session?.preset || selectedPreset();
-  const rows = Math.max(1, Number(preset.rows) || 2);
-  const columns = Math.max(1, Number(preset.columns) || 3);
-  dom.zoneMap.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
-  let html = "";
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const name = `${String.fromCharCode(65 + column)}${row + 1}`;
-      const value = Number(zones[name]) || 0;
-      const kind = value >= 2 ? "busy" : value >= 1 ? "occupied" : "";
-      html += `<div class="zone-cell ${kind}" title="Zone ${name}: ${value} vehicles"><span>${name}</span><strong>${value}</strong></div>`;
-    }
-  }
-  dom.zoneMap.innerHTML = html;
-  dom.zoneCaption.textContent = state.status === "done" ? "REPLAY" : "LIVE";
 }
 
 function renderAdvisory() {
@@ -470,11 +612,15 @@ function renderIncidents() {
   const incidents = [...(state.incidents || [])].sort((a, b) => (b.start_frame || 0) - (a.start_frame || 0));
   const open = incidents.filter((item) => item.open).length;
   dom.incidentCount.textContent = String(incidents.length);
-  dom.kpiIncidents.textContent = String(open);
-  dom.kpiIncidentsSub.textContent = open ? "Response required" : "No active alerts";
-  document.querySelector(".alert-kpi")?.classList.toggle("hot", open > 0);
+  updateHeaderStats();
+  const running = state.status === "running" || state.status === "queued";
+  dom.eventStatus.textContent = running
+    ? `${open} open incident${open === 1 ? "" : "s"} · monitoring selected camera`
+    : "Awaiting monitoring session";
+  dom.eventStatusDot.className = `status-dot ${running ? "online" : ""}`;
+  renderCameraList();
   if (!incidents.length) {
-    dom.incidentList.innerHTML = '<p class="empty">No incidents detected in this deployment.</p>';
+    dom.incidentList.innerHTML = `<p class="empty">${running ? "No incidents detected on this feed." : "Start monitoring to populate the log."}</p>`;
     return;
   }
   dom.incidentList.innerHTML = incidents
@@ -741,12 +887,67 @@ function incidentLabel(type) {
 }
 
 dom.form.addEventListener("submit", startMonitoring);
+dom.run.addEventListener("click", () => dom.form.requestSubmit());
 dom.cancel.addEventListener("click", cancelMonitoring);
 dom.source.addEventListener("change", () => {
-  updateFramesLabel();
-  refreshPreview();
+  selectSource(dom.source.value);
 });
 dom.preset.addEventListener("change", refreshPreview);
+dom.viewTabs.addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-view]");
+  if (tab) switchView(tab.dataset.view);
+});
+document.querySelectorAll(".header-metric").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".header-metric").forEach((metric) => {
+      const selected = metric === button;
+      metric.classList.toggle("selected", selected);
+      metric.setAttribute("aria-pressed", String(selected));
+    });
+    document.getElementById("telemetry-card")?.classList.add("metric-focused");
+  });
+});
+dom.chips.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-f]");
+  if (!chip) return;
+  dom.chips.querySelectorAll(".chip").forEach((item) => {
+    const selected = item === chip;
+    item.classList.toggle("active", selected);
+    item.setAttribute("aria-pressed", String(selected));
+  });
+  state.cameraFilter = chip.dataset.f;
+  renderCameraList();
+});
+dom.searchInput.addEventListener("input", () => {
+  state.searchTerm = dom.searchInput.value.trim().toLowerCase();
+  renderCameraList();
+});
+dom.cycleButton.addEventListener("click", () => {
+  if (state.cycleTimer) {
+    clearInterval(state.cycleTimer);
+    state.cycleTimer = null;
+    dom.cycleButton.classList.remove("on");
+    dom.cycleButton.textContent = "Auto-cycle";
+    return;
+  }
+  if (state.busy) {
+    showFormError("Auto-cycle is unavailable during an active monitoring session.");
+    return;
+  }
+  dom.cycleButton.classList.add("on");
+  dom.cycleButton.textContent = "Cycling…";
+  state.cycleTimer = setInterval(() => {
+    const keys = Object.keys(state.sources);
+    if (keys.length < 2 || state.busy) return;
+    const index = keys.indexOf(dom.source.value);
+    selectSource(keys[(index + 1) % keys.length]);
+  }, 4500);
+});
+dom.fullscreenButton.addEventListener("click", () => {
+  const target = dom.wallGrid;
+  if (target?.requestFullscreen) target.requestFullscreen().catch(() => {});
+  else if (target?.webkitRequestFullscreen) target.webkitRequestFullscreen();
+});
 dom.mode.addEventListener("change", () => {
   dom.detectionLabel.textContent = dom.mode.value === "local" ? "Local" : "Engine";
 });
@@ -778,11 +979,16 @@ setInterval(() => {
 }, 1000);
 dom.clock.textContent = localClock();
 
-renderLanes({});
 renderAdvisory();
 renderIncidents();
 renderCharts();
 updatePolicyLabels();
 updateFramesLabel();
-loadPresets().then(refreshPreview);
-refreshSessions();
+const requestedView = new URLSearchParams(window.location.search).get("view");
+switchView(requestedView === "about" ? "about-view" : "info-view");
+Promise.all([loadSources(), loadPresets()]).then(() => {
+  renderCameraList();
+  renderWall();
+  refreshPreview();
+  refreshSessions();
+});

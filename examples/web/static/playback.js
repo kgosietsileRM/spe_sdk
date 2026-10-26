@@ -43,6 +43,24 @@ export class Playback {
     this.frame.onerror = null;
   }
 
+  clear() {
+    this.pause();
+    this.sessionId = null;
+    this.history = [];
+    this.incidents = [];
+    this.index = 0;
+    this.mode = "idle";
+    this.imageCache.clear();
+    this.scrubber.disabled = true;
+    this.scrubber.max = "0";
+    this.scrubber.value = "0";
+    this.button.disabled = true;
+    this.clock.textContent = "00:00 / 00:00";
+    this.marks.innerHTML = "";
+    this.frame.onload = null;
+    this.frame.onerror = null;
+  }
+
   showLive(url) {
     if (this.mode !== "live") return;
     if (this.frame.src.endsWith(url)) return;

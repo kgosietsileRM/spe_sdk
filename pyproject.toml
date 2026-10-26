@@ -3,7 +3,7 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "spe-sdk"
+name = "spe-engine"
 dynamic = ["version"]
 description = "Python SDK for the Spatial Intelligence Engine (SPE): spatial calibration, coordinate inspection, and an HTTP client."
 readme = "README.md"

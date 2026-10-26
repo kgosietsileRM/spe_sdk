@@ -90,7 +90,7 @@ def test_cli_reports_errors(capsys, tmp_path):
 def test_cli_version(capsys):
     with pytest.raises(SystemExit):
         main(["--version"])
-    assert "spe-sdk" in capsys.readouterr().out
+    assert "spe-engine" in capsys.readouterr().out
 
 
 def test_cli_rejects_bad_points():

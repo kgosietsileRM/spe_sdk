@@ -6,7 +6,7 @@ param(
     [string]$Out = "outputs",
     [string]$Url = "http://127.0.0.1:5000",
     [string]$Model = "model-a",
-    [string[]]$Sources = @("hd", "fullHd"),
+    [string[]]$Sources = @("video"),
     [switch]$Reinstall,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Extra

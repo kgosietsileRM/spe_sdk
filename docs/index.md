@@ -1,7 +1,11 @@
 # SPE SDK documentation
 
-Complete reference for the `spe-sdk` Python package. For a shorter overview and
-quick-start examples, see the [README](../README.md).
+Complete reference for the `spe-engine` Python distribution. Install it with
+`pip install spe-engine`; its Python import package is named `spe`. For a shorter
+overview and quick-start examples, see the [README](../README.md).
+
+This Markdown file is the complete SDK reference. The project README provides
+the quick start and links back here for the full API details.
 
 ## Contents
 
@@ -29,10 +33,12 @@ quick-start examples, see the [README](../README.md).
 ## Installation
 
 ```bash
-pip install -e .                 # from the repository root
-pip install -e ".[http]"         # + the optional httpx transport
-pip install -e ".[dev]"          # + pytest, pytest-cov, ruff, mypy, build, twine
-pip install -e ".[docs]"         # + mkdocs, mkdocs-material, mkdocstrings
+pip install spe-engine             # published package
+pip install "spe-engine[http]"     # + optional httpx transport
+pip install "spe-engine[docs]"     # + documentation tooling
+
+# From a repository checkout:
+pip install -e ".[dev]"           # + pytest, pytest-cov, ruff, mypy, build, twine
 ```
 
 Runtime dependencies are `numpy >= 1.24` and `opencv-python-headless >= 4.8`. The HTTP
@@ -63,7 +69,23 @@ The SDK exposes two independent surfaces that share one coordinate contract:
 
 The **local core** (`SpatialEngine` plus the free functions) performs all
 geometry in-process and never needs a server. The **HTTP client** speaks to a
-running SPE engine server and mirrors the same spatial model.
+running SPE engine server and uses the same spatial coordinate model. Installing
+`spe-engine` installs the Python SDK, not the engine service itself.
+
+| Capability | Local `SpatialEngine` | Remote `SPEClient` |
+| --- | --- | --- |
+| Calibration and transforms | `calibrate`, `image_to_reference`, `reference_to_image` | `calibrate`, `transform_points` call server routes. |
+| Point inspection | `inspect` | `inspect_point` calls the server. |
+| Detection spatialization | `spatialize_detection`, `spatialize_result` | `detect_frame` can request server-side tracking and spatial context. |
+| Grid rendering | Renders image arrays in-process. | `generate_grid` and `generate_calibrated_grid` upload an image to the server. |
+| Sources, models, analysis sessions | Not provided by the local facade. | Managed through server endpoints such as `create_source`, `list_models`, and `start_analysis_session`. |
+
+The two surfaces share coordinate and calibration contracts, but they are not
+identical method-for-method. Choose `SpatialEngine` for local calculations and
+`SPEClient` when a running engine endpoint should perform the request. The
+`spe-engine[http]` extra adds the optional `httpx` transport; it does not start
+the server and is not required for `SPEClient` because `urllib` is available by
+default.
 
 ## Type aliases and version
 
@@ -893,6 +915,20 @@ with SPEClient("http://127.0.0.1:5000") as client:
     client.health()
 ```
 
+The `base_url` must point to a running SPE engine. Constructing a client does not
+start a server: each `client.*` call sends an HTTP request to that endpoint. The
+client defaults to Python's standard-library `urllib` transport. If you install
+`spe-engine[http]`, you can opt into `httpx`:
+
+```python
+from spe import SPEClient, get_default_transport
+
+client = SPEClient(
+    "http://127.0.0.1:5000",
+    transport=get_default_transport("httpx"),
+)
+```
+
 ### Constructor
 
 ```python
@@ -1172,7 +1208,7 @@ spe [--url URL] [--api-key KEY] [--timeout SECONDS] [--compact] [--version]
 
 Global options: `--url` (default `http://127.0.0.1:5000`), `--api-key`,
 `--timeout` (30 seconds), `--compact` (compact JSON), and `--version` (prints
-`spe-sdk <version>`). Points may be written with either commas or semicolons.
+`spe-engine <version>`). Points may be written with either commas or semicolons.
 Errors print `error: ...` to stderr and return exit code `1`.
 
 ```bash
@@ -1213,16 +1249,16 @@ The status-specific subclasses keep `except SPEAPIError` handlers valid.
 
 ## Stand-alone demos
 
-Four runnable applications live under `examples/` and install the built wheel
-from `examples/assets` into their own virtual environments. They never import
-from `src/`, which makes them practical proof that the package works as a
-normal dependency.
+Four runnable applications live under `examples/` and install
+`spe-engine==0.2.1` from PyPI into their own virtual environments. They never
+import from `src/`, demonstrating that the published package works as a normal
+dependency.
 
-- `examples/cli` � interactive media shell with lane analytics and overlays.
-- `examples/powershell` � PowerShell bootstrap around a `.bat` batch analyzer.
-- `examples/template` � Flask studio with spatial presets and Jinja JSON output.
-- `examples/web` � adaptive traffic-signal console with queue-pressure green
-  time recommendations and a what-if cycle slider.
+- `examples/cli` — interactive media shell with lane analytics and overlays.
+- `examples/powershell` — PowerShell bootstrap around a `.bat` batch analyzer.
+- `examples/template` — Flask studio with spatial presets and Jinja JSON output.
+- `examples/web` — FlowTraffic OPS camera wall with selected-feed analytics,
+  lane telemetry, incident logging, response advisories, and replay.
 
 See each folder's `README.md` for setup, commands, and output locations.
 

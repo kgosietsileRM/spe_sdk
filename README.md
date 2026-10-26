@@ -17,7 +17,7 @@ representation. The SDK gives Python applications two ways to work with SPE:
 
 > Part of the SPE entry for the **OpenCV AI Competition 2026**.
 
-[Full API reference →](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md)
+[Full SDK documentation →](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md) · [Browse the static documentation files](https://github.com/kgosietsileRM/spe_sdk/tree/main/docs)
 
 ## Contents
 
@@ -52,16 +52,43 @@ representation. The SDK gives Python applications two ways to work with SPE:
 - Fully typed (PEP 561 `py.typed`), linted with ruff, checked with mypy, and
   tested to ~99% line coverage.
 
+## Local core or SPE server?
+
+`SpatialEngine` runs geometry and spatialization in your Python process. It
+does not need a server. `SPEClient` sends HTTP requests to a separately running
+SPE engine at the `base_url` you provide; installing `spe-engine` does not
+install or start that service.
+
+| Capability | Local `SpatialEngine` | Remote `SPEClient` |
+| --- | --- | --- |
+| Calibration and point transforms | `calibrate`, `image_to_reference`, `reference_to_image` | `calibrate`, `transform_points` call server routes |
+| Point inspection | `inspect` | `inspect_point` calls the server |
+| Detection spatialization | `spatialize_detection`, `spatialize_result` | `detect_frame` can request server-side tracking/spatial context; no local model is bundled |
+| Grid rendering | Renders image arrays in-process | `generate_grid` and `generate_calibrated_grid` upload an image to the server |
+| Sources, models, and analysis sessions | Not provided by the local facade | Managed through server routes such as `create_source`, `list_models`, and `start_analysis_session` |
+
+The surfaces share the same coordinate and calibration model, but they are not
+identical method-for-method. Use the local core for in-process processing; use
+`SPEClient` when a running engine endpoint should own the operation. The
+`[http]` extra adds the optional `httpx` transport; it is not required to use
+`SPEClient`, which has a standard-library transport by default.
+
 ## Installation
 
 ```bash
-pip install -e .                 # from this directory
-pip install -e ".[http]"         # + the optional httpx transport
+pip install spe-engine            # published distribution
+pip install "spe-engine[http]"    # + the optional httpx transport
+pip install "spe-engine[docs]"    # + documentation tooling
+pip install -e .                  # editable install from this repository
 pip install -e ".[dev]"          # + test/lint/type/build tooling
-pip install -e ".[docs]"         # + mkdocs toolchain
+pip install -e ".[docs]"         # + documentation tooling
 ```
 
-Extras may be combined, e.g. `pip install -e ".[http,dev]"`.
+For a published install, extras can be combined as `pip install
+"spe-engine[http,docs]"`. From a source checkout, `pip install -e
+".[dev]"` installs the development tools.
+
+The PyPI distribution is named `spe-engine`; import it in Python as `spe`.
 
 Runtime dependencies are intentionally small: `numpy` and
 `opencv-python-headless`. The
@@ -98,6 +125,11 @@ print(engine.zone_for_image_point(image_point))  # e.g. "C4"
 
 ## Quick start — HTTP client
 
+This example makes requests to a separately running SPE engine. Change the
+base URL to your engine endpoint. `SPEClient` uses the standard-library
+transport by default; after installing `spe-engine[http]`, you can opt into
+`httpx` with `get_default_transport("httpx")`.
+
 ```python
 from spe import SPEClient
 
@@ -118,6 +150,18 @@ with SPEClient("http://127.0.0.1:5000") as client:
         source_dimensions={"width": 1280, "height": 720},
     )
     print(inspection)
+```
+
+To explicitly select `httpx` instead of the default transport (after installing
+`spe-engine[http]`):
+
+```python
+from spe import SPEClient, get_default_transport
+
+client = SPEClient(
+    "http://127.0.0.1:5000",
+    transport=get_default_transport("httpx"),
+)
 ```
 
 ## Quick start — async client
@@ -241,40 +285,25 @@ except SPEError as error:  # catch-all for the whole SDK
 
 ## Examples
 
-Runnable scripts live under [`examples/`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples):
-
-| Script | Shows |
-| --- | --- |
-| [`local_calibration.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/local_calibration.py) | In-process calibration, inspection, zones, and state round-tripping. |
-| [`detect_and_spatialize.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/detect_and_spatialize.py) | Enriching provider-neutral detections with calibrated spatial data. |
-| [`retail_zone_analytics.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/retail_zone_analytics.py) | Per-zone occupancy, unique visitors, and dwell time from a frame sequence. |
-| [`security_intrusion_detection.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/security_intrusion_detection.py) | Alerting when a person's ground point enters a restricted polygon. |
-| [`warehouse_grid_inventory.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/warehouse_grid_inventory.py) | Bay occupancy map, empty-bay list, and fill ratio from pallet detections. |
-| [`traffic_lane_speed.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/traffic_lane_speed.py) | A metric reference plane (`units="meters"`) for lane assignment and speed. |
-| [`annotated_overlay.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/annotated_overlay.py) | Rendering the calibrated grid plus zone-labelled boxes to a PNG. |
-| [`tracking_and_motion.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/tracking_and_motion.py) | Stable track ids, per-track speed, and next-position prediction. |
-| [`analytics_pipeline.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/analytics_pipeline.py) | Zone occupancy, track summaries, line crossings, and observation persistence. |
-| [`http_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_client.py) | Talking to a running engine with the synchronous client. |
-| [`async_client.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/async_client.py) | The asyncio client (`AsyncSPEClient`). |
-| [`http_analysis_session.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/http_analysis_session.py) | A full server analysis session: health, source, frames, complete. |
-| [`stream_video.py`](https://github.com/kgosietsileRM/spe_sdk/blob/main/examples/stream_video.py) | Streaming video frames into the detection endpoint with OpenCV. |
-
-### Stand-alone demo apps
-
-Four self-contained apps install the built SDK wheel from `examples/assets` into
-their own virtual environments. They never import from `src/`, so each one
-demonstrates SDK independence end to end.
+The stand-alone apps install `spe-engine==0.2.1` from PyPI into their own
+virtual environments. They never import from `src/`.
 
 | Demo | Shows |
 | --- | --- |
 | [`examples/cli`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/cli) | Interactive media shell driven by `assets/link.json`, with lane analytics, overlays, and JSON reports. |
-| [`examples/powershell`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/powershell) | PowerShell bootstrap that invokes a real `.bat` batch analyzer over multiple clips. |
+| [`examples/powershell`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/powershell) | Batch analyzer for configured media sources, with JSON and CSV reports. |
 | [`examples/template`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/template) | Flask studio that applies spatial presets and Jinja JSON templates to media or uploads. |
-| [`examples/web`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/web) | Adaptive traffic-signal console: queue pressure drives green-time recommendations with a what-if cycle slider. |
+| [`examples/web`](https://github.com/kgosietsileRM/spe_sdk/tree/main/examples/web) | FlowTraffic OPS camera wall with selected-feed lane analytics, incident logging, advisories, and replay. |
 
 Run any demo with its `run.ps1` / `run.bat`; the first run bootstraps its local
-`.venv`. The large sample videos stay local and are intentionally gitignored;
-the wheel and `link.json` are tracked so the demos remain installable.
+`.venv` and installs dependencies from PyPI. Camera sources are read from
+`examples/assets/link.json`; remote feeds are used directly or cached locally
+by the demo as appropriate. To move an existing demo environment off a bundled
+wheel, run `bootstrap.ps1 -Reinstall` in that demo folder once.
+
+## Documentation
+
+Open the [complete SDK reference](https://github.com/kgosietsileRM/spe_sdk/blob/main/docs/index.md).
 
 ## API overview
 
@@ -343,8 +372,9 @@ src/spe/
 
 1. Bump `__version__` in `src/spe/_version.py`.
 2. Move the `Unreleased` entries in [`CHANGELOG.md`](https://github.com/kgosietsileRM/spe_sdk/blob/main/CHANGELOG.md) under the new version.
-3. Tag and push (`git tag v0.1.1 && git push origin v0.1.1`); the release
-   workflow builds, checks, and publishes to PyPI.
+3. Build and validate the artifacts: `python -m build` and `twine check dist/*`.
+4. Upload with `python -m twine upload dist/*`, then tag the same version, e.g.
+   `git tag v0.2.1 && git push origin v0.2.1`.
 
 ## Contributing
 

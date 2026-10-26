@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-26
+
+### Fixed
+
+- Use absolute documentation links in the README so they resolve on PyPI.
+- Clarify the published distribution name (`spe-engine`) versus Python import
+  package (`spe`).
+
+## [0.2.0] - 2026-10-26
+
 ### Added
 
 - `spe.tracking` (`ModelAgnosticTracker`, `TrackingConfig`): provider-neutral
@@ -43,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Four stand-alone demo apps (`examples/cli`, `examples/powershell`,
   `examples/template`, `examples/web`) that install the built wheel into their
   own virtual environments and cover interactive CLIs, batch automation,
-  template-driven JSON, and adaptive traffic-signal recommendations.
+  template-driven JSON, and the FlowTraffic OPS camera wall.
 
 ### Changed
 
@@ -74,5 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inspection, and calibration.
 - Runnable examples under `examples/`.
 
-[Unreleased]: https://github.com/kgosietsileRM/spe_sdk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kgosietsileRM/spe_sdk/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/kgosietsileRM/spe_sdk/releases/tag/v0.2.1
+[0.2.0]: https://github.com/kgosietsileRM/spe_sdk/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kgosietsileRM/spe_sdk/releases/tag/v0.1.0

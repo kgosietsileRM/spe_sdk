@@ -4,8 +4,8 @@ Takes media from `../assets/link.json` or an upload, applies a spatial template
 (calibration + grid), and renders a consistent JSON report through a Jinja JSON
 template.
 
-Independent environment: the local `.venv` installs the SDK wheel from
-`../assets` and Flask; nothing imports from `../../src`.
+Independent environment: the local `.venv` installs `spe-engine==0.2.1` from
+PyPI together with Flask; nothing imports from `../../src`.
 
 ## Run
 
@@ -15,6 +15,9 @@ Independent environment: the local `.venv` installs the SDK wheel from
 
 Open <http://127.0.0.1:5001>.
 
+To recreate or migrate an existing environment to the PyPI SDK install, run
+`.\bootstrap.ps1 -Reinstall`.
+
 Presets live in `presets/`:
 
 - `highway.json` — 2×3 grid over a three-lane approach.
@@ -23,7 +26,7 @@ Presets live in `presets/`:
 ## API
 
 ```powershell
-curl.exe "http://127.0.0.1:5001/api/analyze?source=hd&preset=highway&frames=20&fps=5"
+curl.exe "http://127.0.0.1:5001/api/analyze?source=video&preset=highway&frames=20&fps=5"
 curl.exe -X POST -F media=@clip.mp4 -F preset=highway "http://127.0.0.1:5001/api/analyze"
 ```
 

@@ -70,7 +70,7 @@ def _print(payload: Any, compact: bool = False) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="spe", description="Spatial Intelligence Engine SDK CLI.")
-    parser.add_argument("--version", action="version", version=f"spe-sdk {__version__}")
+    parser.add_argument("--version", action="version", version=f"spe-engine {__version__}")
     parser.add_argument(
         "--url", default="http://127.0.0.1:5000", help="Base URL of a running SPE server."
     )

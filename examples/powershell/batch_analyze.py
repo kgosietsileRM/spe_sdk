@@ -29,7 +29,7 @@ FIELDS = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sources", nargs="+", default=["hd", "fullHd"])
+    parser.add_argument("--sources", nargs="+", default=["video"])
     parser.add_argument("--mode", choices=("local", "server"), default="local")
     parser.add_argument("--url", default="http://127.0.0.1:5000")
     parser.add_argument("--model", default="model-a")

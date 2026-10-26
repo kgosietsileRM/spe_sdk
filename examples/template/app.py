@@ -26,7 +26,7 @@ app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024
 def form_settings() -> dict[str, Any]:
     values = request.values
     return {
-        "source": values.get("source", "hd"),
+        "source": values.get("source", "video"),
         "preset_name": values.get("preset", "highway"),
         "mode": values.get("mode", "local"),
         "frames": int(values.get("frames", 60)),

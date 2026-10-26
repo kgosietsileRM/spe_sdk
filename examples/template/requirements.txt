@@ -1,1 +1,2 @@
 flask>=3.0
+spe-engine==0.2.1

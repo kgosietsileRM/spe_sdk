@@ -428,7 +428,20 @@ def _policy_from_payload(payload: dict[str, Any]) -> dict[str, float]:
 
 
 def _default_source(sources: dict[str, str]) -> str:
-    return "live" if "live" in sources else next(iter(sources))
+    return next(
+        (key for key, value in sources.items() if live_media.is_live_source(value)),
+        next(iter(sources)),
+    )
+
+
+def source_display_name(key: str) -> str:
+    """Give link.json keys a concise camera-wall label."""
+    match = re.fullmatch(r"cam(\d+)", key.lower())
+    if match:
+        return f"Traffic Camera {int(match.group(1)):02d}"
+    if key.lower() == "video":
+        return "Recorded Traffic Sample"
+    return key.replace("_", " ").replace("-", " ").title()
 
 
 def _default_preset(presets: dict[str, dict[str, Any]]) -> str:
@@ -580,6 +593,7 @@ def index() -> str:
         presets=presets,
         default_source=_default_source(sources),
         default_preset=_default_preset(presets),
+        source_label=source_display_name,
     )
 
 

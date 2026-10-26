@@ -24,15 +24,16 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
 }
 
 & $venvPython -m pip install --quiet --upgrade pip
-$wheel = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot "..\assets") -Filter "spe_sdk-*.whl" |
-    Sort-Object Name -Descending |
-    Select-Object -First 1
-if (-not $wheel) {
-    throw "No spe_sdk wheel found in examples/assets. Build it with 'python -m build' first."
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not upgrade pip in the demo environment."
 }
-& $venvPython -m pip install --quiet $wheel.FullName
-if (Test-Path -LiteralPath (Join-Path $PSScriptRoot "requirements.txt")) {
-    & $venvPython -m pip install --quiet -r requirements.txt
+$requirements = Join-Path $PSScriptRoot "requirements.txt"
+if (-not (Test-Path -LiteralPath $requirements)) {
+    throw "Missing requirements.txt for this demo."
+}
+& $venvPython -m pip install --quiet -r $requirements
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not install demo dependencies from PyPI."
 }
 
 & $venvPython -c "import spe, sys; print(f'independent env: Python {sys.version.split()[0]}, spe {spe.__version__} from {spe.__file__}')"

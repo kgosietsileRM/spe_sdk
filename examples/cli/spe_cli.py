@@ -7,7 +7,7 @@ Usage::
 
     .\\run.ps1
     spe_demo sources
-    spe_demo use hd
+    spe_demo use video
     spe_demo analyze 80
 """
 
@@ -147,7 +147,7 @@ def print_help() -> None:
     print(
         "\ncommands:\n"
         "  sources                     list media keys\n"
-        "  use <key>                   select media (hd, fullHd, online, ...)\n"
+        "  use <key>                   select media (for example, video)\n"
         "  info                        show source metadata\n"
         "  grid <rows> <columns>       change the calibrated grid\n"
         "  mode <local|server>         switch detection backend\n"

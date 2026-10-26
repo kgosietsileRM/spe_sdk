@@ -63,7 +63,7 @@
   <div class="actions">
     <a href="{{ url_for('last_frame') }}">View annotated frame</a>
     <a href="{{ url_for('download') }}">Download JSON</a>
-    <a href="{{ url_for('api_analyze') }}?source=hd&amp;preset=highway&amp;frames=10">Quick API example</a>
+    <a href="{{ url_for('api_analyze') }}?source=video&amp;preset=highway&amp;frames=10">Quick API example</a>
   </div>
   {% else %}
   <p class="note">No report yet. Run an analysis to see the annotated frame and downloadable JSON.</p>

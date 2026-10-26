@@ -24,4 +24,4 @@ def test_cli_module_entry_point(monkeypatch, capsys):
         with pytest.raises(SystemExit) as exit_info:
             runpy.run_module("spe.cli", run_name="__main__")
     assert exit_info.value.code == 0
-    assert "spe-sdk" in capsys.readouterr().out
+    assert "spe-engine" in capsys.readouterr().out
